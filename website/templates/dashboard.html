@@ -169,6 +169,133 @@
         .empty-state p {
             margin: 0 0 1.5rem;
         }
+        .header-buttons {
+            display: flex;
+            gap: 0.75rem;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.active {
+            display: flex;
+        }
+        .modal-content {
+            background: #ffffff;
+            padding: 2rem;
+            border-radius: 12px;
+            max-width: 900px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.6rem;
+        }
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.8rem;
+            color: #64748b;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+        }
+        .close-btn:hover {
+            background: #f1f5f9;
+            color: #0f172a;
+        }
+        .gpu-section {
+            margin-bottom: 2rem;
+        }
+        .gpu-section h3 {
+            margin: 0 0 1rem;
+            font-size: 1.2rem;
+            color: #334155;
+        }
+        .gpu-card {
+            background: #f8fafc;
+            padding: 1.25rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border: 1px solid #e2e8f0;
+        }
+        .gpu-card h4 {
+            margin: 0 0 1rem;
+            font-size: 1rem;
+            color: #0f172a;
+        }
+        .gpu-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 0.75rem;
+        }
+        .gpu-stat {
+            display: flex;
+            flex-direction: column;
+        }
+        .gpu-stat-label {
+            font-size: 0.8rem;
+            color: #64748b;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        .gpu-stat-value {
+            font-size: 1.1rem;
+            color: #0f172a;
+            font-weight: 700;
+        }
+        .progress-bar {
+            background: #e2e8f0;
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #667eea;
+            transition: width 0.3s;
+        }
+        .progress-fill.high {
+            background: #ef4444;
+        }
+        .progress-fill.medium {
+            background: #f59e0b;
+        }
+        .error-message {
+            color: #ef4444;
+            padding: 1rem;
+            background: #fee2e2;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #64748b;
+        }
         @media (prefers-color-scheme: dark) {
             body {
                 background: #0f172a;
@@ -195,6 +322,26 @@
             .meta-item {
                 color: #94a3b8;
             }
+            .modal-content {
+                background: #1e293b;
+            }
+            .gpu-section h3 {
+                color: #cbd5e1;
+            }
+            .gpu-card {
+                background: #0f172a;
+                border-color: #334155;
+            }
+            .gpu-card h4 {
+                color: #f8fafc;
+            }
+            .gpu-stat-value {
+                color: #f8fafc;
+            }
+            .close-btn:hover {
+                background: #334155;
+                color: #f8fafc;
+            }
         }
     </style>
 </head>
@@ -210,7 +357,10 @@
     <main>
         <div class="header-section">
             <h2>My Experiments</h2>
-            <a href="{{ url_for('new_experiment') }}" class="btn">+ New Experiment</a>
+            <div class="header-buttons">
+                <button onclick="showGpuUsage()" class="btn btn-secondary">📊 View GPU Usage</button>
+                <a href="{{ url_for('new_experiment') }}" class="btn">+ New Experiment</a>
+            </div>
         </div>
         
         {% if experiments %}
@@ -279,6 +429,19 @@
         {% endif %}
     </main>
     
+    <!-- GPU Usage Modal -->
+    <div id="gpuModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>💻 System Resources</h2>
+                <button class="close-btn" onclick="closeGpuModal()">&times;</button>
+            </div>
+            <div id="gpuContent">
+                <div class="loading">Loading system information...</div>
+            </div>
+        </div>
+    </div>
+    
     <script>
         function deleteExperiment(id) {
             if (!confirm('Are you sure you want to delete this experiment? This action cannot be undone.')) {
@@ -302,6 +465,128 @@
             .catch(error => {
                 alert('Error deleting experiment: ' + error.message);
             });
+        }
+        
+        function showGpuUsage() {
+            const modal = document.getElementById('gpuModal');
+            const content = document.getElementById('gpuContent');
+            
+            modal.classList.add('active');
+            content.innerHTML = '<div class="loading">Loading system information...</div>';
+            
+            fetch('/api/gpu_usage')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.ok) {
+                        content.innerHTML = renderGpuUsage(data);
+                    } else {
+                        content.innerHTML = `<div class="error-message">Error: ${data.message}</div>`;
+                    }
+                })
+                .catch(error => {
+                    content.innerHTML = `<div class="error-message">Error loading GPU usage: ${error.message}</div>`;
+                });
+        }
+        
+        function closeGpuModal() {
+            const modal = document.getElementById('gpuModal');
+            modal.classList.remove('active');
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('gpuModal');
+            if (event.target === modal) {
+                closeGpuModal();
+            }
+        }
+        
+        function renderGpuUsage(data) {
+            let html = '';
+            
+            // RAM Section
+            html += '<div class="gpu-section">';
+            html += '<h3>💾 RAM Usage</h3>';
+            if (data.ram && !data.ram.error) {
+                html += '<div class="gpu-card">';
+                html += '<div class="gpu-stats">';
+                html += `<div class="gpu-stat">
+                    <span class="gpu-stat-label">Total</span>
+                    <span class="gpu-stat-value">${data.ram.total}</span>
+                </div>`;
+                html += `<div class="gpu-stat">
+                    <span class="gpu-stat-label">Used</span>
+                    <span class="gpu-stat-value">${data.ram.used}</span>
+                </div>`;
+                html += `<div class="gpu-stat">
+                    <span class="gpu-stat-label">Free</span>
+                    <span class="gpu-stat-value">${data.ram.free}</span>
+                </div>`;
+                html += `<div class="gpu-stat">
+                    <span class="gpu-stat-label">Available</span>
+                    <span class="gpu-stat-value">${data.ram.available}</span>
+                </div>`;
+                html += '</div>';
+                html += '</div>';
+            } else {
+                html += `<div class="error-message">Error loading RAM info: ${data.ram?.error || 'Unknown error'}</div>`;
+            }
+            html += '</div>';
+            
+            // GPU Section
+            html += '<div class="gpu-section">';
+            html += '<h3>🎮 GPU Usage</h3>';
+            
+            if (data.gpus && data.gpus.length > 0) {
+                if (data.gpus[0].error) {
+                    html += `<div class="error-message">${data.gpus[0].error}</div>`;
+                } else {
+                    data.gpus.forEach(gpu => {
+                        const memUsagePercent = Math.round((gpu.memory_used_mb / gpu.memory_total_mb) * 100);
+                        const gpuUtilClass = gpu.utilization_percent > 80 ? 'high' : (gpu.utilization_percent > 50 ? 'medium' : '');
+                        const memUtilClass = memUsagePercent > 80 ? 'high' : (memUsagePercent > 50 ? 'medium' : '');
+                        
+                        html += '<div class="gpu-card">';
+                        html += `<h4>GPU ${gpu.index}: ${gpu.name}</h4>`;
+                        html += '<div class="gpu-stats">';
+                        
+                        html += `<div class="gpu-stat">
+                            <span class="gpu-stat-label">GPU Utilization</span>
+                            <span class="gpu-stat-value">${gpu.utilization_percent}%</span>
+                            <div class="progress-bar">
+                                <div class="progress-fill ${gpuUtilClass}" style="width: ${gpu.utilization_percent}%"></div>
+                            </div>
+                        </div>`;
+                        
+                        html += `<div class="gpu-stat">
+                            <span class="gpu-stat-label">Memory Usage</span>
+                            <span class="gpu-stat-value">${gpu.memory_used_mb} MB / ${gpu.memory_total_mb} MB</span>
+                            <div class="progress-bar">
+                                <div class="progress-fill ${memUtilClass}" style="width: ${memUsagePercent}%"></div>
+                            </div>
+                        </div>`;
+                        
+                        html += `<div class="gpu-stat">
+                            <span class="gpu-stat-label">Memory Free</span>
+                            <span class="gpu-stat-value">${gpu.memory_free_mb} MB</span>
+                        </div>`;
+                        
+                        html += `<div class="gpu-stat">
+                            <span class="gpu-stat-label">Temperature</span>
+                            <span class="gpu-stat-value">${gpu.temperature_c}°C</span>
+                        </div>`;
+                        
+                        html += '</div>';
+                        html += '</div>';
+                    });
+                }
+            } else {
+                html += '<div class="error-message">No GPU information available</div>';
+            }
+            
+            html += '</div>';
+            
+            return html;
         }
     </script>
 </body>

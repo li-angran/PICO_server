@@ -700,5 +700,76 @@ def get_experiment_log(experiment_id: int) -> Response:
     })
 
 
+@app.get("/api/gpu_usage")
+@login_required
+def get_gpu_usage() -> Response:
+    """Get current GPU and RAM usage information."""
+    try:
+        import subprocess
+        
+        # Get RAM usage
+        ram_info = {}
+        try:
+            result = subprocess.run(
+                ["free", "-h"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                lines = result.stdout.strip().split('\n')
+                if len(lines) >= 2:
+                    mem_line = lines[1].split()
+                    ram_info = {
+                        "total": mem_line[1],
+                        "used": mem_line[2],
+                        "free": mem_line[3],
+                        "available": mem_line[6] if len(mem_line) > 6 else mem_line[3]
+                    }
+        except Exception as e:
+            ram_info = {"error": str(e)}
+        
+        # Get GPU usage using nvidia-smi
+        gpu_info = []
+        try:
+            result = subprocess.run(
+                ["nvidia-smi", "--query-gpu=index,name,memory.total,memory.used,memory.free,utilization.gpu,temperature.gpu", "--format=csv,noheader,nounits"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                lines = result.stdout.strip().split('\n')
+                for line in lines:
+                    if line.strip():
+                        parts = [p.strip() for p in line.split(',')]
+                        if len(parts) >= 7:
+                            gpu_info.append({
+                                "index": int(parts[0]),
+                                "name": parts[1],
+                                "memory_total_mb": int(parts[2]),
+                                "memory_used_mb": int(parts[3]),
+                                "memory_free_mb": int(parts[4]),
+                                "utilization_percent": int(parts[5]),
+                                "temperature_c": int(parts[6])
+                            })
+        except FileNotFoundError:
+            gpu_info = [{"error": "nvidia-smi not found. GPU monitoring not available."}]
+        except Exception as e:
+            gpu_info = [{"error": str(e)}]
+        
+        return jsonify({
+            "ok": True,
+            "ram": ram_info,
+            "gpus": gpu_info
+        })
+    
+    except Exception as e:
+        return jsonify({
+            "ok": False,
+            "message": f"Error getting GPU usage: {e}"
+        }), 500
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5010, debug=False)
