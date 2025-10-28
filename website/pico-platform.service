@@ -1,0 +1,15 @@
+[Unit]
+Description=PICO Calcium Processing Platform
+After=network.target
+
+[Service]
+Type=simple
+User=angran
+WorkingDirectory=/data/home/angran/BBNC/code/PICO_ca_processing/website
+Environment="PATH=/data/home/angran/BBNC/code/PICO_ca_processing/website/venv/bin"
+ExecStart=/data/home/angran/BBNC/code/PICO_ca_processing/website/venv/bin/gunicorn --workers 4 --bind 0.0.0.0:5000 --timeout 3600 app:app
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

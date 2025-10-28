@@ -1,0 +1,270 @@
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                                                                               ║
+║                   PICO CALCIUM PROCESSING PLATFORM                            ║
+║                         Installation Complete!                                ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+📦 WHAT HAS BEEN CREATED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ Complete web-based platform in: /data/home/angran/BBNC/code/PICO_ca_processing/website/
+
+✓ Core Components:
+  • Flask web application (app.py)
+  • SQLite database with user authentication
+  • HTML templates (login + dashboard)
+  • RESTful API for experiment management
+
+✓ Management Tools:
+  • Database initialization script (init_db.py)
+  • System monitoring tool (monitor.py)
+  • Backup script (backup.sh)
+  • Automated setup script (setup.sh)
+
+✓ Documentation:
+  • README.md - Project overview
+  • QUICKSTART.md - 5-minute quick start
+  • DEPLOYMENT.md - Comprehensive deployment guide
+
+✓ Configuration Files:
+  • requirements.txt - Python dependencies
+  • config.py - Application settings
+  • pico-platform.service - Systemd service
+  • .gitignore - Git exclusions
+
+
+🚀 QUICK START
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Navigate to the website directory:
+   $ cd /data/home/angran/BBNC/code/PICO_ca_processing/website
+
+2. Run the setup script:
+   $ ./setup.sh
+
+3. Create user accounts:
+   $ python init_db.py create <username> <password>
+
+4. Start the server:
+   $ ./start_server.sh
+
+5. Access the platform:
+   Open browser → http://<your-server-ip>:5000
+
+
+📋 NEXT STEPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+IMMEDIATE:
+  1. Run setup script to install dependencies
+  2. Create user accounts for your team
+  3. Test the platform in development mode
+  4. Configure firewall if accessing remotely
+
+BEFORE PRODUCTION:
+  1. Change SECRET_KEY in app.py (CRITICAL!)
+  2. Configure HTTPS with nginx reverse proxy
+  3. Set up automated backups (cron job)
+  4. Test experiment workflow end-to-end
+
+OPTIONAL:
+  1. Set up systemd service for auto-start
+  2. Configure monitoring alerts
+  3. Customize GPU selection options
+  4. Adjust worker count for your hardware
+
+
+🎯 KEY FEATURES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ User Management
+  • No registration - admin creates accounts
+  • Secure authentication with hashed passwords
+  • Per-user experiment workspace
+
+✓ Experiment Management
+  • Create experiments with custom names/descriptions
+  • Edit all process_script.py parameters via UI
+  • Select GPU for each experiment
+  • Start/stop experiments with one click
+
+✓ Real-time Monitoring
+  • Live status updates (every 5 seconds)
+  • GPU utilization visualization
+  • Streaming log viewer
+  • Process tracking (PID, CPU, memory)
+
+✓ Output Management
+  • Automatic output directory creation
+  • File browser with size/date info
+  • One-click file downloads
+  • Experiment history with timestamps
+
+✓ Multi-User Support
+  • Multiple users, multiple experiments
+  • Independent GPU assignment
+  • No interference between users
+  • Fair resource sharing
+
+
+📚 DOCUMENTATION GUIDE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📖 For a 5-minute quick start:
+   → Read: QUICKSTART.md
+
+📖 For comprehensive deployment and troubleshooting:
+   → Read: DEPLOYMENT.md
+
+📖 For project overview and architecture:
+   → Read: README.md
+
+
+🔧 COMMON COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+USER MANAGEMENT:
+  $ python init_db.py create <user> <pass>   # Create user
+  $ python init_db.py list                    # List all users
+  $ python init_db.py delete <user>           # Delete user
+
+SERVER:
+  $ ./start_server.sh                         # Start production server
+  $ nohup ./start_server.sh > server.log &    # Start in background
+  $ pkill -f gunicorn                         # Stop server
+  $ ps aux | grep gunicorn                    # Check if running
+
+MONITORING:
+  $ python monitor.py --once                  # One-time status
+  $ python monitor.py --interval 10           # Continuous monitoring
+  $ tail -f server.log                        # View server logs
+
+BACKUP:
+  $ ./backup.sh                               # Manual backup
+  $ crontab -e                                # Schedule automated backups
+
+
+🌐 NETWORK ACCESS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+LOCAL ACCESS:
+  http://localhost:5000
+
+REMOTE ACCESS:
+  http://<server-ip>:5000
+
+FIREWALL (if needed):
+  $ sudo ufw allow 5000/tcp
+
+FIND SERVER IP:
+  $ hostname -I
+
+
+⚠️  SECURITY CHECKLIST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CRITICAL:
+  [ ] Change SECRET_KEY in app.py
+  [ ] Use strong user passwords
+  [ ] Set up HTTPS for production
+  [ ] Configure firewall properly
+  [ ] Set up automated backups
+
+RECOMMENDED:
+  [ ] Use nginx reverse proxy
+  [ ] Enable SSL/TLS
+  [ ] Regular security updates
+  [ ] Monitor access logs
+  [ ] Limit network exposure
+
+
+💡 TIPS & BEST PRACTICES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ Check GPU utilization before starting experiments
+✓ Use descriptive experiment names (include date, subject, condition)
+✓ Monitor disk space regularly (experiments can be large)
+✓ Stop experiments properly using the UI (not kill commands)
+✓ Download important results before deleting experiments
+✓ Regular backups prevent data loss
+✓ Use different GPUs for parallel experiments
+
+
+📊 SYSTEM REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+MINIMUM:
+  • Linux server (Ubuntu 18.04+)
+  • Python 3.7+
+  • 8GB RAM
+  • CUDA-capable GPU(s)
+  • Modern web browser
+
+RECOMMENDED:
+  • 16GB+ RAM
+  • Multiple GPUs
+  • SSD storage
+  • Gigabit network
+
+
+🎓 TYPICAL WORKFLOW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. User logs in from their workstation
+2. Checks GPU availability on dashboard
+3. Creates new experiment with parameters
+4. Selects available GPU
+5. Starts experiment
+6. Monitors progress via live logs
+7. Downloads results when complete
+8. Creates new experiment or logs out
+
+
+🐛 TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+"Can't access from other devices"
+  → Check firewall: sudo ufw allow 5000/tcp
+
+"Port already in use"
+  → Kill existing process: lsof -i :5000 | kill -9 <PID>
+
+"Experiment won't start"
+  → Check logs in experiments/exp_*/process.log
+  → Verify data paths exist
+  → Check GPU availability
+
+For more troubleshooting:
+  → See DEPLOYMENT.md Section 9
+
+
+📞 SUPPORT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Platform Issues:
+  • Check server logs: tail -f error.log
+  • Monitor system: python monitor.py --once
+  • Review documentation in DEPLOYMENT.md
+
+Processing Issues:
+  • Check experiment logs
+  • Refer to PICO pipeline documentation
+  • Verify process_script.py parameters
+
+
+🎉 YOU'RE ALL SET!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The PICO Calcium Processing Platform is ready to use!
+
+Next: Run ./setup.sh to complete installation
+
+Questions? Check the documentation:
+  • QUICKSTART.md for immediate start
+  • DEPLOYMENT.md for detailed guide
+  • README.md for project overview
+
+Happy processing! 🧠✨
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

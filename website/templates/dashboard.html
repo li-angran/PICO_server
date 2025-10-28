@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PICO Platform - Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f7fa;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 24px;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: white;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .toolbar h2 {
+            color: #333;
+        }
+
+        .experiments-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .experiment-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .experiment-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .experiment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+        }
+
+        .experiment-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .experiment-description {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+
+        .experiment-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .meta-item {
+            background: #f5f7fa;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .status-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .status-created { background: #e2e8f0; color: #4a5568; }
+        .status-running { background: #bee3f8; color: #2c5282; animation: pulse 2s infinite; }
+        .status-completed { background: #c6f6d5; color: #22543d; }
+        .status-failed { background: #fed7d7; color: #742a2a; }
+        .status-stopped { background: #fbd38d; color: #744210; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .experiment-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            margin: 20px;
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            color: #333;
+            font-size: 20px;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .params-editor {
+            background: #f5f7fa;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .param-row {
+            display: grid;
+            grid-template-columns: 200px 1fr 80px;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .param-row input {
+            padding: 8px;
+        }
+
+        .log-viewer {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .file-list {
+            list-style: none;
+        }
+
+        .file-item {
+            padding: 10px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-item:hover {
+            background: #f5f7fa;
+        }
+
+        .gpu-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .gpu-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .gpu-card h4 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .gpu-meter {
+            background: #e2e8f0;
+            height: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 5px 0;
+        }
+
+        .gpu-meter-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state svg {
+            width: 100px;
+            height: 100px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧠 PICO Calcium Processing Platform</h1>
+        <div class="header-right">
+            <span id="username"></span>
+            <button class="btn btn-secondary" onclick="location.href='/logout'">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="toolbar">
+            <h2>My Experiments</h2>
+            <button class="btn btn-primary" onclick="showCreateModal()">+ New Experiment</button>
+        </div>
+
+        <div class="gpu-info" id="gpuInfo"></div>
+
+        <div class="experiments-grid" id="experimentsGrid">
+            <div class="empty-state">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                </svg>
+                <p>No experiments yet. Create your first experiment!</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Experiment Modal -->
+    <div class="modal" id="experimentModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">New Experiment</h3>
+                <button class="close-btn" onclick="closeModal('experimentModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="experimentForm">
+                    <div class="form-group">
+                        <label for="expName">Experiment Name *</label>
+                        <input type="text" id="expName" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="expDescription">Description</label>
+                        <textarea id="expDescription"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="gpuId">GPU ID</label>
+                        <select id="gpuId">
+                            <option value="0">GPU 0</option>
+                            <option value="1">GPU 1</option>
+                            <option value="2">GPU 2</option>
+                            <option value="3">GPU 3</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Parameters</label>
+                        <div class="params-editor" id="paramsEditor"></div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Save Experiment</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Experiment Details Modal -->
+    <div class="modal" id="detailsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="detailsTitle">Experiment Details</h3>
+                <button class="close-btn" onclick="closeModal('detailsModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="detailsContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let experiments = [];
+        let currentExperimentId = null;
+        const defaultParams = {
+            "jump_to_rmbg": false,
+            "jump_to_seg": false,
+            "jump_to_vis": false,
+            "set_frame_num": 0,
+            "data_path": "data/input/path",
+            "out_path": "data/output/path",
+            "fr": 10,
+            "mc_chunk_size": 1000,
+            "save_movie": true,
+            "max_shifts": "(100, 100)",
+            "strides": "(96, 96)",
+            "overlaps": "(48, 48)",
+            "num_frames_split": 100,
+            "max_deviation_rigid": 3,
+            "pw_rigid": false,
+            "shifts_opencv": true,
+            "border_nan": "copy",
+            "downsample_ratio": 0.1,
+            "crop_parameter": "153 303 1000 1000",
+            "intensity_corr_flag": false,
+            "bad_frame_detect_flag": false,
+            "up_sample": 2,
+            "rmbg_chunk_size": 2000,
+            "rmbg_gsize": 6,
+            "ckpt_pth": "utils/deepdefinite_ckpt_resize_2.pth",
+            "device": "cuda",
+            "gpu_ids": 0,
+            "patch_size": 500,
+            "pixel_size": 2,
+            "minArea": 50,
+            "avgArea": 100,
+            "thresh_pmap": 1,
+            "thresh_mask": 0.5,
+            "thresh_COM0": 6,
+            "thresh_COM": 10,
+            "cons": 5
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadExperiments();
+            loadGPUInfo();
+            setInterval(() => {
+                loadExperiments();
+                loadGPUInfo();
+            }, 5000);
+        });
+
+        async function loadExperiments() {
+            try {
+                const response = await fetch('/api/experiments');
+                experiments = await response.json();
+                renderExperiments();
+            } catch (error) {
+                console.error('Error loading experiments:', error);
+            }
+        }
+
+        async function loadGPUInfo() {
+            try {
+                const response = await fetch('/api/gpu/info');
+                const data = await response.json();
+                renderGPUInfo(data.gpus);
+            } catch (error) {
+                console.error('Error loading GPU info:', error);
+            }
+        }
+
+        function renderGPUInfo(gpus) {
+            const container = document.getElementById('gpuInfo');
+            container.innerHTML = gpus.map(gpu => `
+                <div class="gpu-card">
+                    <h4>GPU ${gpu.id}: ${gpu.name}</h4>
+                    <div>
+                        <small>Memory Usage</small>
+                        <div class="gpu-meter">
+                            <div class="gpu-meter-fill" style="width: ${gpu.memory_total > 0 ? (gpu.memory_used / gpu.memory_total * 100) : 0}%"></div>
+                        </div>
+                        <small>${gpu.memory_used} MB / ${gpu.memory_total} MB</small>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <small>GPU Load: ${gpu.load.toFixed(1)}%</small>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderExperiments() {
+            const grid = document.getElementById('experimentsGrid');
+            
+            if (experiments.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                        </svg>
+                        <p>No experiments yet. Create your first experiment!</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            grid.innerHTML = experiments.map(exp => `
+                <div class="experiment-card" onclick="showDetails(${exp.id})">
+                    <div class="experiment-header">
+                        <div>
+                            <div class="experiment-title">${exp.name}</div>
+                            <span class="status-badge status-${exp.status}">${exp.status.toUpperCase()}</span>
+                        </div>
+                    </div>
+                    <div class="experiment-description">${exp.description || 'No description'}</div>
+                    <div class="experiment-meta">
+                        <span class="meta-item">📍 GPU ${exp.gpu_id}</span>
+                        <span class="meta-item">📅 ${new Date(exp.created_at).toLocaleString()}</span>
+                    </div>
+                    <div class="experiment-actions" onclick="event.stopPropagation()">
+                        ${exp.status === 'created' || exp.status === 'stopped' || exp.status === 'failed' ? 
+                            `<button class="btn btn-success btn-small" onclick="startExperiment(${exp.id})">▶ Start</button>
+                             <button class="btn btn-primary btn-small" onclick="editExperiment(${exp.id})">✏️ Edit</button>` : ''}
+                        ${exp.status === 'running' ? 
+                            `<button class="btn btn-danger btn-small" onclick="stopExperiment(${exp.id})">⏹ Stop</button>` : ''}
+                        ${exp.status !== 'running' ? 
+                            `<button class="btn btn-danger btn-small" onclick="deleteExperiment(${exp.id})">🗑 Delete</button>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function showCreateModal() {
+            currentExperimentId = null;
+            document.getElementById('modalTitle').textContent = 'New Experiment';
+            document.getElementById('expName').value = '';
+            document.getElementById('expDescription').value = '';
+            document.getElementById('gpuId').value = '0';
+            renderParamsEditor(defaultParams);
+            document.getElementById('experimentModal').classList.add('show');
+        }
+
+        function renderParamsEditor(params) {
+            const editor = document.getElementById('paramsEditor');
+            editor.innerHTML = Object.entries(params).map(([key, value]) => `
+                <div class="param-row">
+                    <span>${key}</span>
+                    <input type="text" id="param_${key}" value="${value}">
+                </div>
+            `).join('');
+        }
+
+        function getParamsFromEditor() {
+            const params = {};
+            Object.keys(defaultParams).forEach(key => {
+                const input = document.getElementById(`param_${key}`);
+                if (input) {
+                    let value = input.value;
+                    // Try to parse as JSON for proper types
+                    try {
+                        value = JSON.parse(value);
+                    } catch {
+                        // Keep as string if not valid JSON
+                    }
+                    params[key] = value;
+                }
+            });
+            return params;
+        }
+
+        async function editExperiment(id) {
+            event.stopPropagation();
+            try {
+                const response = await fetch(`/api/experiments/${id}`);
+                const exp = await response.json();
+                
+                currentExperimentId = id;
+                document.getElementById('modalTitle').textContent = 'Edit Experiment';
+                document.getElementById('expName').value = exp.name;
+                document.getElementById('expDescription').value = exp.description;
+                document.getElementById('gpuId').value = exp.gpu_id;
+                renderParamsEditor(exp.parameters);
+                document.getElementById('experimentModal').classList.add('show');
+            } catch (error) {
+                alert('Error loading experiment: ' + error.message);
+            }
+        }
+
+        document.getElementById('experimentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const data = {
+                name: document.getElementById('expName').value,
+                description: document.getElementById('expDescription').value,
+                gpu_id: parseInt(document.getElementById('gpuId').value),
+                parameters: getParamsFromEditor()
+            };
+            
+            try {
+                const url = currentExperimentId 
+                    ? `/api/experiments/${currentExperimentId}`
+                    : '/api/experiments';
+                const method = currentExperimentId ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    closeModal('experimentModal');
+                    loadExperiments();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (error) {
+                alert('Error saving experiment: ' + error.message);
+            }
+        });
+
+        async function startExperiment(id) {
+            if (!confirm('Start this experiment?')) return;
+            
+            try {
+                const response = await fetch(`/api/experiments/${id}/start`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                if (result.success) {
+                    loadExperiments();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (error) {
+                alert('Error starting experiment: ' + error.message);
+            }
+        }
+
+        async function stopExperiment(id) {
+            if (!confirm('Stop this experiment?')) return;
+            
+            try {
+                const response = await fetch(`/api/experiments/${id}/stop`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                if (result.success || result.message) {
+                    loadExperiments();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (error) {
+                alert('Error stopping experiment: ' + error.message);
+            }
+        }
+
+        async function deleteExperiment(id) {
+            if (!confirm('Delete this experiment? This cannot be undone.')) return;
+            
+            try {
+                const response = await fetch(`/api/experiments/${id}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                if (result.success) {
+                    loadExperiments();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (error) {
+                alert('Error deleting experiment: ' + error.message);
+            }
+        }
+
+        async function showDetails(id) {
+            try {
+                const [expResponse, logResponse, filesResponse] = await Promise.all([
+                    fetch(`/api/experiments/${id}`),
+                    fetch(`/api/experiments/${id}/log`),
+                    fetch(`/api/experiments/${id}/outputs`)
+                ]);
+                
+                const exp = await expResponse.json();
+                const logData = await logResponse.json();
+                const filesData = await filesResponse.json();
+                
+                document.getElementById('detailsTitle').textContent = exp.name;
+                
+                const detailsContent = document.getElementById('detailsContent');
+                detailsContent.innerHTML = `
+                    <div class="form-group">
+                        <label>Status</label>
+                        <span class="status-badge status-${exp.status}">${exp.status.toUpperCase()}</span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Description</label>
+                        <p>${exp.description || 'No description'}</p>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>GPU ID</label>
+                        <p>${exp.gpu_id}</p>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Created</label>
+                        <p>${new Date(exp.created_at).toLocaleString()}</p>
+                    </div>
+                    
+                    ${exp.started_at ? `
+                        <div class="form-group">
+                            <label>Started</label>
+                            <p>${new Date(exp.started_at).toLocaleString()}</p>
+                        </div>
+                    ` : ''}
+                    
+                    ${exp.completed_at ? `
+                        <div class="form-group">
+                            <label>Completed</label>
+                            <p>${new Date(exp.completed_at).toLocaleString()}</p>
+                        </div>
+                    ` : ''}
+                    
+                    ${exp.output_path ? `
+                        <div class="form-group">
+                            <label>Output Path</label>
+                            <p>${exp.output_path}</p>
+                        </div>
+                    ` : ''}
+                    
+                    <div class="form-group">
+                        <label>Process Log</label>
+                        <div class="log-viewer">${logData.log || 'No log available'}</div>
+                    </div>
+                    
+                    ${filesData.files.length > 0 ? `
+                        <div class="form-group">
+                            <label>Output Files (${filesData.files.length})</label>
+                            <ul class="file-list">
+                                ${filesData.files.map(file => `
+                                    <li class="file-item">
+                                        <span>📄 ${file.name}</span>
+                                        <a href="/api/experiments/${id}/download/${file.name}" class="btn btn-primary btn-small" download>Download</a>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+                `;
+                
+                document.getElementById('detailsModal').classList.add('show');
+                
+                // Auto-refresh log if running
+                if (exp.status === 'running') {
+                    setTimeout(() => showDetails(id), 3000);
+                }
+            } catch (error) {
+                alert('Error loading details: ' + error.message);
+            }
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('show');
+        }
+
+        // Close modal on background click
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('show');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
