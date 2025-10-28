@@ -176,14 +176,116 @@ def start_experiment(exp_id):
     script_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'process_script.py')
     cmd = ['python', script_path]
     
-    # Add all parameters as command line arguments
-    for key, value in params.items():
-        if isinstance(value, bool):
-            cmd.extend([f'--{key}', str(value).lower()])
-        elif isinstance(value, list):
-            cmd.extend([f'--{key}'] + [str(v) for v in value])
-        else:
-            cmd.extend([f'--{key}', str(value)])
+    # Map of supported args and their types/formatters
+    bool_keys = [
+        "jump_to_rmbg",
+        "jump_to_seg",
+        "jump_to_vis",
+        "save_movie",
+        "pw_rigid",
+        "shifts_opencv",
+        "intensity_corr_flag",
+        "bad_frame_detect_flag",
+    ]
+    int_keys = [
+        "set_frame_num",
+        "fr",
+        "mc_chunk_size",
+        "num_frames_split",
+        "max_deviation_rigid",
+        "up_sample",
+        "rmbg_chunk_size",
+        "rmbg_gsize",
+        "patch_size",
+        "pixel_size",
+        "minArea",
+        "avgArea",
+        "thresh_pmap",
+        "thresh_COM0",
+        "thresh_COM",
+        "cons",
+        "avi_quality",
+    ]
+    float_keys = [
+        "downsample_ratio",
+        "thresh_mask",
+    ]
+    str_keys = [
+        "border_nan",
+        "ckpt_pth",
+        "device",
+        "gpu_ids",
+    ]
+    tuple_keys = [
+        "max_shifts",
+        "strides",
+        "overlaps",
+    ]
+    list_multi_token = {
+        # value is a comma or whitespace separated list of ints; we will split into multiple CLI tokens
+        "crop_parameter": int,
+    }
+
+    def _has_value(key: str) -> bool:
+        val = params.get(key)
+        return val is not None and str(val).strip() != ""
+
+    # set_frame_num special handling for auto flag from UI: if auto==true and no explicit number, use 0
+    if str(params.get("auto_set_frame") or "").lower() in {"true", "1", "yes", "on"}:
+        if not (params.get("set_frame_num") and str(params.get("set_frame_num")).strip()):
+            params["set_frame_num"] = 0
+
+    # Booleans -> 'true'/'false'
+    for k in bool_keys:
+        if k in params:
+            val = params.get(k)
+            if isinstance(val, str):
+                val_norm = val.lower() in {"true", "1", "yes", "on"}
+            else:
+                val_norm = bool(val)
+            cmd.extend([f"--{k}", "true" if val_norm else "false"])
+
+    # Integers
+    for k in int_keys:
+        if _has_value(k):
+            try:
+                cmd.extend([f"--{k}", str(int(params.get(k)))])
+            except Exception:
+                raise ValueError(f"Invalid integer for {k}.")
+
+    # Floats
+    for k in float_keys:
+        if _has_value(k):
+            try:
+                cmd.extend([f"--{k}", str(float(params.get(k)))])
+            except Exception:
+                raise ValueError(f"Invalid float for {k}.")
+
+    # Strings
+    for k in str_keys:
+        if _has_value(k):
+            cmd.extend([f"--{k}", str(params.get(k)).strip()])
+
+    # Tuples like "100,100" or "(100, 100)" pass as single string; parser accepts both
+    for k in tuple_keys:
+        if _has_value(k):
+            raw = str(params.get(k)).strip()
+            # sanitize spaces
+            raw = raw.strip().strip("()")
+            cmd.extend([f"--{k}", raw])
+
+    # List-like (multi-token)
+    for k, caster in list_multi_token.items():
+        if _has_value(k):
+            raw = str(params.get(k))
+            parts = [p for p in raw.replace("[", "").replace("]", "").replace("(", "").replace(")", "").replace("\n", " ").replace("\t", " ").replace(";", ",").replace(" ", ",").split(",") if p != ""]
+            try:
+                casted = [str(caster(p)) for p in parts]
+            except Exception:
+                raise ValueError(f"Invalid list for {k}. Provide comma-separated integers.")
+            if casted:
+                cmd.append(f"--{k}")
+                cmd.extend(casted)
     
     # Set GPU environment variable
     env = os.environ.copy()
