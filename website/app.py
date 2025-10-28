@@ -1,459 +1,344 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_file
-from flask_sqlalchemy import SQLAlchemy
-from werkzeug.security import check_password_hash, generate_password_hash
-from datetime import datetime
-import subprocess
-import json
+#!/usr/bin/env python3
+"""Simple web interface for running the PICO calcium processing pipeline."""
+
+from __future__ import annotations
+
 import os
-import signal
-import psutil
-from functools import wraps
+import queue
+import shlex
+import subprocess
+import sys
+import threading
+from pathlib import Path
+from typing import Any, Dict, Optional
 
-app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key-change-this-in-production'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///pico_platform.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+from flask import Flask, jsonify, render_template, request, Response
 
-db = SQLAlchemy(app)
+# Flask app configuration
+app = Flask(__name__, template_folder="templates", static_folder="static")
 
-# Database Models
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(256), nullable=False)
-    experiments = db.relationship('Experiment', backref='user', lazy=True)
+# Paths and global state
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PIPELINE_SCRIPT = PROJECT_ROOT / "somm_processingv1.py"
 
-class Experiment(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False)
-    description = db.Column(db.Text)
-    parameters = db.Column(db.Text, nullable=False)  # JSON string
-    gpu_id = db.Column(db.Integer, default=0)
-    status = db.Column(db.String(20), default='created')  # created, running, completed, failed, stopped
-    pid = db.Column(db.Integer, nullable=True)  # Process ID when running
-    output_path = db.Column(db.String(500))
-    log_file = db.Column(db.String(500))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    started_at = db.Column(db.DateTime)
-    completed_at = db.Column(db.DateTime)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+_history_lock = threading.Lock()
+_process_lock = threading.Lock()
+_log_history: list[str] = []
+_log_queue: "queue.Queue[Dict[str, Any]]" = queue.Queue()
+_LOG_HISTORY_MAX = 10000
+_current_process: Optional[subprocess.Popen[str]] = None
+_last_exit_code: Optional[int] = None
 
-# Authentication decorator
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
 
-# Routes
-@app.route('/')
-def index():
-    if 'user_id' in session:
-        return redirect(url_for('dashboard'))
-    return redirect(url_for('login'))
+def _append_log(message: str) -> None:
+    """Store a log message and notify any listeners."""
+    sanitized = message.rstrip("\n")
+    with _history_lock:
+        _log_history.append(sanitized)
+        overflow = len(_log_history) - _LOG_HISTORY_MAX
+        if overflow > 0:
+            del _log_history[:overflow]
+    _log_queue.put({"type": "line", "data": sanitized})
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        data = request.get_json()
-        username = data.get('username')
-        password = data.get('password')
-        
-        user = User.query.filter_by(username=username).first()
-        if user and check_password_hash(user.password_hash, password):
-            session['user_id'] = user.id
-            session['username'] = user.username
-            return jsonify({'success': True})
-        return jsonify({'success': False, 'message': 'Invalid credentials'}), 401
-    
-    return render_template('login.html')
 
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('login'))
+def _reset_logs() -> None:
+    """Clear existing logs and pending queue items."""
+    with _history_lock:
+        _log_history.clear()
+    while not _log_queue.empty():
+        try:
+            _log_queue.get_nowait()
+        except queue.Empty:
+            break
 
-@app.route('/dashboard')
-@login_required
-def dashboard():
-    return render_template('dashboard.html')
 
-@app.route('/api/experiments', methods=['GET'])
-@login_required
-def get_experiments():
-    experiments = Experiment.query.filter_by(user_id=session['user_id']).order_by(Experiment.created_at.desc()).all()
-    return jsonify([{
-        'id': exp.id,
-        'name': exp.name,
-        'description': exp.description,
-        'status': exp.status,
-        'gpu_id': exp.gpu_id,
-        'created_at': exp.created_at.isoformat(),
-        'started_at': exp.started_at.isoformat() if exp.started_at else None,
-        'completed_at': exp.completed_at.isoformat() if exp.completed_at else None,
-        'output_path': exp.output_path
-    } for exp in experiments])
+def _monitor_process(proc: subprocess.Popen[str]) -> None:
+    """Stream the pipeline output until completion."""
+    global _current_process, _last_exit_code
 
-@app.route('/api/experiments/<int:exp_id>', methods=['GET'])
-@login_required
-def get_experiment(exp_id):
-    exp = Experiment.query.filter_by(id=exp_id, user_id=session['user_id']).first_or_404()
-    return jsonify({
-        'id': exp.id,
-        'name': exp.name,
-        'description': exp.description,
-        'parameters': json.loads(exp.parameters),
-        'gpu_id': exp.gpu_id,
-        'status': exp.status,
-        'pid': exp.pid,
-        'output_path': exp.output_path,
-        'log_file': exp.log_file,
-        'created_at': exp.created_at.isoformat(),
-        'started_at': exp.started_at.isoformat() if exp.started_at else None,
-        'completed_at': exp.completed_at.isoformat() if exp.completed_at else None
-    })
+    try:
+        assert proc.stdout is not None  # keep mypy quiet
+        for raw_line in proc.stdout:
+            _append_log(raw_line)
+    finally:
+        if proc.stdout is not None:
+            proc.stdout.close()
+        return_code = proc.wait()
+        _last_exit_code = return_code
+        _append_log(f"Pipeline finished with exit code {return_code}")
+        _log_queue.put({"type": "done", "code": return_code})
+        with _process_lock:
+            _current_process = None
 
-@app.route('/api/experiments', methods=['POST'])
-@login_required
-def create_experiment():
-    data = request.get_json()
-    
-    # Create experiment
-    experiment = Experiment(
-        name=data['name'],
-        description=data.get('description', ''),
-        parameters=json.dumps(data['parameters']),
-        gpu_id=data.get('gpu_id', 0),
-        user_id=session['user_id']
-    )
-    
-    db.session.add(experiment)
-    db.session.commit()
-    
-    return jsonify({'success': True, 'id': experiment.id})
 
-@app.route('/api/experiments/<int:exp_id>', methods=['PUT'])
-@login_required
-def update_experiment(exp_id):
-    exp = Experiment.query.filter_by(id=exp_id, user_id=session['user_id']).first_or_404()
-    
-    if exp.status == 'running':
-        return jsonify({'success': False, 'message': 'Cannot edit running experiment'}), 400
-    
-    data = request.get_json()
-    exp.name = data.get('name', exp.name)
-    exp.description = data.get('description', exp.description)
-    exp.parameters = json.dumps(data.get('parameters', json.loads(exp.parameters)))
-    exp.gpu_id = data.get('gpu_id', exp.gpu_id)
-    
-    db.session.commit()
-    return jsonify({'success': True})
-
-@app.route('/api/experiments/<int:exp_id>/start', methods=['POST'])
-@login_required
-def start_experiment(exp_id):
-    exp = Experiment.query.filter_by(id=exp_id, user_id=session['user_id']).first_or_404()
-    
-    if exp.status == 'running':
-        return jsonify({'success': False, 'message': 'Experiment already running'}), 400
-    
-    # Parse parameters
-    params = json.loads(exp.parameters)
-    
-    # Create output directory
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    output_base = os.path.join('experiments', f'exp_{exp.id}_{timestamp}')
-    os.makedirs(output_base, exist_ok=True)
-    
-    # Update output path
-    exp.output_path = output_base
-    log_file = os.path.join(output_base, 'process.log')
-    exp.log_file = log_file
-    
-    # Build command
-    script_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'process_script.py')
-    cmd = ['python', script_path]
-    
-    # Map of supported args and their types/formatters
-    bool_keys = [
-        "jump_to_rmbg",
-        "jump_to_seg",
-        "jump_to_vis",
-        "save_movie",
-        "pw_rigid",
-        "shifts_opencv",
-        "intensity_corr_flag",
-        "bad_frame_detect_flag",
-    ]
-    int_keys = [
-        "set_frame_num",
-        "fr",
-        "mc_chunk_size",
-        "num_frames_split",
-        "max_deviation_rigid",
-        "up_sample",
-        "rmbg_chunk_size",
-        "rmbg_gsize",
-        "patch_size",
-        "pixel_size",
-        "minArea",
-        "avgArea",
-        "thresh_pmap",
-        "thresh_COM0",
-        "thresh_COM",
-        "cons",
-        "avi_quality",
-    ]
-    float_keys = [
-        "downsample_ratio",
-        "thresh_mask",
-    ]
-    str_keys = [
-        "border_nan",
-        "ckpt_pth",
-        "device",
-        "gpu_ids",
-    ]
-    tuple_keys = [
-        "max_shifts",
-        "strides",
-        "overlaps",
-    ]
-    list_multi_token = {
-        # value is a comma or whitespace separated list of ints; we will split into multiple CLI tokens
-        "crop_parameter": int,
+@app.get("/")
+def index() -> str:
+    """Render the main dashboard."""
+    defaults = {
+        "input_path": "",
+        "output_path": "",
+        "script_exists": PIPELINE_SCRIPT.exists(),
     }
+    return render_template("index.html", defaults=defaults)
 
-    def _has_value(key: str) -> bool:
-        val = params.get(key)
-        return val is not None and str(val).strip() != ""
 
-    # set_frame_num special handling for auto flag from UI: if auto==true and no explicit number, use 0
-    if str(params.get("auto_set_frame") or "").lower() in {"true", "1", "yes", "on"}:
-        if not (params.get("set_frame_num") and str(params.get("set_frame_num")).strip()):
-            params["set_frame_num"] = 0
+@app.post("/run")
+def run_pipeline() -> Response:
+    """Kick off a pipeline run with the provided paths."""
+    global _current_process, _last_exit_code
 
-    # Booleans -> 'true'/'false'
-    for k in bool_keys:
-        if k in params:
-            val = params.get(k)
-            if isinstance(val, str):
-                val_norm = val.lower() in {"true", "1", "yes", "on"}
-            else:
-                val_norm = bool(val)
-            cmd.extend([f"--{k}", "true" if val_norm else "false"])
+    payload = request.get_json(silent=True) or request.form
 
-    # Integers
-    for k in int_keys:
-        if _has_value(k):
-            try:
-                cmd.extend([f"--{k}", str(int(params.get(k)))])
-            except Exception:
-                raise ValueError(f"Invalid integer for {k}.")
+    input_raw = (payload.get("input_path") or "").strip()
+    output_raw = (payload.get("output_path") or "").strip()
+    # Optional advanced args
+    # We accept additional fields matching somm_processingv1.py CLI args.
+    # Types will be normalized below when building the command.
 
-    # Floats
-    for k in float_keys:
-        if _has_value(k):
-            try:
-                cmd.extend([f"--{k}", str(float(params.get(k)))])
-            except Exception:
-                raise ValueError(f"Invalid float for {k}.")
+    if not input_raw or not output_raw:
+        return jsonify({"ok": False, "message": "Both input and output paths are required."}), 400
 
-    # Strings
-    for k in str_keys:
-        if _has_value(k):
-            cmd.extend([f"--{k}", str(params.get(k)).strip()])
+    input_path = Path(os.path.expanduser(input_raw)).resolve()
+    output_path = Path(os.path.expanduser(output_raw)).resolve()
 
-    # Tuples like "100,100" or "(100, 100)" pass as single string; parser accepts both
-    for k in tuple_keys:
-        if _has_value(k):
-            raw = str(params.get(k)).strip()
-            # sanitize spaces
-            raw = raw.strip().strip("()")
-            cmd.extend([f"--{k}", raw])
+    if not input_path.exists() or not input_path.is_dir():
+        return (
+            jsonify({"ok": False, "message": f"Input path '{input_path}' does not exist or is not a directory."}),
+            400,
+        )
 
-    # List-like (multi-token)
-    for k, caster in list_multi_token.items():
-        if _has_value(k):
-            raw = str(params.get(k))
-            parts = [p for p in raw.replace("[", "").replace("]", "").replace("(", "").replace(")", "").replace("\n", " ").replace("\t", " ").replace(";", ",").replace(" ", ",").split(",") if p != ""]
-            try:
-                casted = [str(caster(p)) for p in parts]
-            except Exception:
-                raise ValueError(f"Invalid list for {k}. Provide comma-separated integers.")
-            if casted:
-                cmd.append(f"--{k}")
-                cmd.extend(casted)
-    
-    # Set GPU environment variable
-    env = os.environ.copy()
-    env['CUDA_VISIBLE_DEVICES'] = str(exp.gpu_id)
-    
-    # Start process
     try:
-        with open(log_file, 'w') as log:
-            process = subprocess.Popen(
+        output_path.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        return jsonify({"ok": False, "message": f"Unable to create output path: {exc}"}), 400
+
+    if not PIPELINE_SCRIPT.exists():
+        return (
+            jsonify({"ok": False, "message": f"Pipeline script not found at {PIPELINE_SCRIPT}"}),
+            500,
+        )
+
+    with _process_lock:
+        if _current_process and _current_process.poll() is None:
+            return jsonify({"ok": False, "message": "Pipeline is already running."}), 409
+
+        _reset_logs()
+        _last_exit_code = None
+
+        env = os.environ.copy()
+        env["PYTHONUNBUFFERED"] = "1"
+
+        cmd: list[str] = [
+            sys.executable,
+            str(PIPELINE_SCRIPT),
+            "--data_path",
+            str(input_path),
+            "--out_path",
+            str(output_path),
+        ]
+
+        # Map of supported args and their types/formatters
+        bool_keys = [
+            "jump_to_rmbg",
+            "jump_to_seg",
+            "jump_to_vis",
+            "save_movie",
+            "pw_rigid",
+            "shifts_opencv",
+            "intensity_corr_flag",
+            "bad_frame_detect_flag",
+        ]
+        int_keys = [
+            "set_frame_num",
+            "fr",
+            "mc_chunk_size",
+            "num_frames_split",
+            "max_deviation_rigid",
+            "up_sample",
+            "rmbg_chunk_size",
+            "rmbg_gsize",
+            "patch_size",
+            "pixel_size",
+            "minArea",
+            "avgArea",
+            "thresh_pmap",
+            "thresh_COM0",
+            "thresh_COM",
+            "cons",
+            "avi_quality",
+        ]
+        float_keys = [
+            "downsample_ratio",
+            "thresh_mask",
+        ]
+        str_keys = [
+            "border_nan",
+            "ckpt_pth",
+            "device",
+            "gpu_ids",
+        ]
+        tuple_keys = [
+            "max_shifts",
+            "strides",
+            "overlaps",
+        ]
+        list_multi_token = {
+            # value is a comma or whitespace separated list of ints; we will split into multiple CLI tokens
+            "crop_parameter": int,
+        }
+
+        def _has_value(key: str) -> bool:
+            val = payload.get(key)
+            return val is not None and str(val).strip() != ""
+
+        # set_frame_num special handling for auto flag from UI: if auto==true and no explicit number, use 0
+        if str(payload.get("auto_set_frame") or "").lower() in {"true", "1", "yes", "on"}:
+            if not (payload.get("set_frame_num") and str(payload.get("set_frame_num")).strip()):
+                payload = dict(payload)
+                payload["set_frame_num"] = 0
+
+        # Booleans -> 'true'/'false'
+        for k in bool_keys:
+            if k in payload:
+                val = payload.get(k)
+                if isinstance(val, str):
+                    val_norm = val.lower() in {"true", "1", "yes", "on"}
+                else:
+                    val_norm = bool(val)
+                cmd.extend([f"--{k}", "true" if val_norm else "false"])
+
+        # Integers
+        for k in int_keys:
+            if _has_value(k):
+                try:
+                    cmd.extend([f"--{k}", str(int(payload.get(k)))])
+                except Exception:
+                    return jsonify({"ok": False, "message": f"Invalid integer for {k}."}), 400
+
+        # Floats
+        for k in float_keys:
+            if _has_value(k):
+                try:
+                    cmd.extend([f"--{k}", str(float(payload.get(k)))])
+                except Exception:
+                    return jsonify({"ok": False, "message": f"Invalid float for {k}."}), 400
+
+        # Strings
+        for k in str_keys:
+            if _has_value(k):
+                cmd.extend([f"--{k}", str(payload.get(k)).strip()])
+
+        # Tuples like "100,100" or "(100, 100)" pass as single string; parser accepts both
+        for k in tuple_keys:
+            if _has_value(k):
+                raw = str(payload.get(k)).strip()
+                # sanitize spaces
+                raw = raw.strip().strip("()")
+                cmd.extend([f"--{k}", raw])
+
+        # List-like (multi-token)
+        for k, caster in list_multi_token.items():
+            if _has_value(k):
+                raw = str(payload.get(k))
+                parts = [p for p in raw.replace("[", "").replace("]", "").replace("(", "").replace(")", "").replace("\n", " ").replace("\t", " ").replace(";", ",").replace(" ", ",").split(",") if p != ""]
+                try:
+                    casted = [str(caster(p)) for p in parts]
+                except Exception:
+                    return jsonify({"ok": False, "message": f"Invalid list for {k}. Provide comma-separated integers."}), 400
+                if casted:
+                    cmd.append(f"--{k}")
+                    cmd.extend(casted)
+
+        _append_log(f"Starting pipeline run at project root: {PROJECT_ROOT}")
+        _append_log("Command: " + " ".join(shlex.quote(part) for part in cmd))
+
+        try:
+            proc = subprocess.Popen(  # noqa: PLW1510
                 cmd,
-                stdout=log,
+                cwd=str(PROJECT_ROOT),
+                stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
                 env=env,
-                cwd=os.path.dirname(script_path)
             )
-        
-        exp.pid = process.pid
-        exp.status = 'running'
-        exp.started_at = datetime.utcnow()
-        db.session.commit()
-        
-        return jsonify({'success': True, 'pid': process.pid})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        except Exception as exc:  # pylint: disable=broad-except
+            _append_log(f"Failed to start pipeline: {exc}")
+            _log_queue.put({"type": "done", "code": -1})
+            _last_exit_code = -1
+            return jsonify({"ok": False, "message": f"Failed to start pipeline: {exc}"}), 500
 
-@app.route('/api/experiments/<int:exp_id>/stop', methods=['POST'])
-@login_required
-def stop_experiment(exp_id):
-    exp = Experiment.query.filter_by(id=exp_id, user_id=session['user_id']).first_or_404()
-    
-    if exp.status != 'running':
-        return jsonify({'success': False, 'message': 'Experiment not running'}), 400
-    
-    if exp.pid:
-        try:
-            # Kill process tree
-            parent = psutil.Process(exp.pid)
-            for child in parent.children(recursive=True):
-                child.kill()
-            parent.kill()
-            
-            exp.status = 'stopped'
-            exp.completed_at = datetime.utcnow()
-            db.session.commit()
-            
-            return jsonify({'success': True})
-        except psutil.NoSuchProcess:
-            exp.status = 'stopped'
-            exp.completed_at = datetime.utcnow()
-            db.session.commit()
-            return jsonify({'success': True, 'message': 'Process already terminated'})
-        except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
-    
-    return jsonify({'success': False, 'message': 'No PID recorded'}), 400
+        _current_process = proc
+        threading.Thread(target=_monitor_process, args=(proc,), daemon=True).start()
 
-@app.route('/api/experiments/<int:exp_id>/status', methods=['GET'])
-@login_required
-def check_experiment_status(exp_id):
-    exp = Experiment.query.filter_by(id=exp_id, user_id=session['user_id']).first_or_404()
-    
-    # Check if process is still running
-    if exp.status == 'running' and exp.pid:
-        try:
-            process = psutil.Process(exp.pid)
-            if process.status() == psutil.STATUS_ZOMBIE:
-                raise psutil.NoSuchProcess(exp.pid)
-        except psutil.NoSuchProcess:
-            # Process completed, check exit status
-            exp.status = 'completed'
-            exp.completed_at = datetime.utcnow()
-            db.session.commit()
-    
-    return jsonify({
-        'status': exp.status,
-        'pid': exp.pid,
-        'started_at': exp.started_at.isoformat() if exp.started_at else None,
-        'completed_at': exp.completed_at.isoformat() if exp.completed_at else None
-    })
+    return jsonify({"ok": True, "message": "Pipeline started.", "running": True})
 
-@app.route('/api/experiments/<int:exp_id>/log', methods=['GET'])
-@login_required
-def get_experiment_log(exp_id):
-    exp = Experiment.query.filter_by(id=exp_id, user_id=session['user_id']).first_or_404()
-    
-    if not exp.log_file or not os.path.exists(exp.log_file):
-        return jsonify({'log': 'No log file available'})
-    
-    # Get last N lines
-    lines = int(request.args.get('lines', 100))
-    
+
+@app.get("/logs")
+def fetch_logs() -> Response:
+    """Return the current log buffer."""
+    with _history_lock:
+        logs = list(_log_history)
+    return jsonify({"logs": logs})
+
+
+@app.get("/status")
+def fetch_status() -> Response:
+    """Expose whether the pipeline is running and the last exit code."""
+    with _process_lock:
+        running = _current_process is not None and _current_process.poll() is None
+    return jsonify({"running": running, "exit_code": _last_exit_code})
+
+
+@app.get("/stream")
+def stream_logs() -> Response:
+    """Server-sent events feed for live log updates."""
+
+    def event_stream() -> Any:
+        while True:
+            try:
+                item = _log_queue.get(timeout=1.0)
+            except queue.Empty:
+                yield ": keepalive\n\n"
+                continue
+
+            item_type = item.get("type")
+            if item_type == "line":
+                data = item.get("data", "")
+                yield f"data: {data}\n\n"
+            elif item_type == "done":
+                code = item.get("code")
+                yield f"event: done\ndata: {code}\n\n"
+            else:
+                yield f"data: {item}\n\n"
+
+    return Response(event_stream(), mimetype="text/event-stream")
+
+
+@app.get("/detect_frames")
+def detect_frames() -> Response:
+    """Detect number of frames in an input directory by scanning common image extensions."""
+    payload = request.args or request.get_json(silent=True) or {}
+    input_raw = (payload.get("input_path") or "").strip()
+    if not input_raw:
+        return jsonify({"ok": False, "message": "Provide input_path."}), 400
+    input_path = Path(os.path.expanduser(input_raw)).resolve()
+    if not input_path.exists() or not input_path.is_dir():
+        return jsonify({"ok": False, "message": f"Input path '{input_path}' is not a directory."}), 400
+
+    exts = [".tif", ".tiff", ".jpg", ".jpeg", ".png"]
+    counts: Dict[str, int] = {}
+    total = 0
     try:
-        with open(exp.log_file, 'r') as f:
-            all_lines = f.readlines()
-            log_content = ''.join(all_lines[-lines:])
-        return jsonify({'log': log_content})
-    except Exception as e:
-        return jsonify({'log': f'Error reading log: {str(e)}'})
+        for ext in exts:
+            c = sum(1 for _ in input_path.glob(f"*{ext}")) + sum(1 for _ in input_path.glob(f"*{ext.upper()}"))
+            counts[ext] = c
+            total += c
+    except Exception as exc:  # pylint: disable=broad-except
+        return jsonify({"ok": False, "message": f"Failed to scan directory: {exc}"}), 500
 
-@app.route('/api/experiments/<int:exp_id>/outputs', methods=['GET'])
-@login_required
-def get_experiment_outputs(exp_id):
-    exp = Experiment.query.filter_by(id=exp_id, user_id=session['user_id']).first_or_404()
-    
-    if not exp.output_path or not os.path.exists(exp.output_path):
-        return jsonify({'files': []})
-    
-    files = []
-    for root, dirs, filenames in os.walk(exp.output_path):
-        for filename in filenames:
-            filepath = os.path.join(root, filename)
-            relpath = os.path.relpath(filepath, exp.output_path)
-            files.append({
-                'name': relpath,
-                'size': os.path.getsize(filepath),
-                'modified': datetime.fromtimestamp(os.path.getmtime(filepath)).isoformat()
-            })
-    
-    return jsonify({'files': files})
+    return jsonify({"ok": True, "frames": total, "counts": counts})
 
-@app.route('/api/experiments/<int:exp_id>/download/<path:filename>', methods=['GET'])
-@login_required
-def download_file(exp_id, filename):
-    exp = Experiment.query.filter_by(id=exp_id, user_id=session['user_id']).first_or_404()
-    
-    if not exp.output_path:
-        return jsonify({'error': 'No output path'}), 404
-    
-    filepath = os.path.join(exp.output_path, filename)
-    
-    if not os.path.exists(filepath) or not os.path.isfile(filepath):
-        return jsonify({'error': 'File not found'}), 404
-    
-    return send_file(filepath, as_attachment=True)
 
-@app.route('/api/experiments/<int:exp_id>', methods=['DELETE'])
-@login_required
-def delete_experiment(exp_id):
-    exp = Experiment.query.filter_by(id=exp_id, user_id=session['user_id']).first_or_404()
-    
-    if exp.status == 'running':
-        return jsonify({'success': False, 'message': 'Cannot delete running experiment'}), 400
-    
-    db.session.delete(exp)
-    db.session.commit()
-    
-    return jsonify({'success': True})
-
-@app.route('/api/gpu/info', methods=['GET'])
-@login_required
-def get_gpu_info():
-    try:
-        import GPUtil
-        gpus = GPUtil.getGPUs()
-        gpu_info = [{
-            'id': gpu.id,
-            'name': gpu.name,
-            'memory_free': gpu.memoryFree,
-            'memory_used': gpu.memoryUsed,
-            'memory_total': gpu.memoryTotal,
-            'load': gpu.load * 100
-        } for gpu in gpus]
-        return jsonify({'gpus': gpu_info})
-    except:
-        # Fallback if GPUtil not available
-        return jsonify({'gpus': [{'id': i, 'name': f'GPU {i}', 'memory_free': 0, 'memory_used': 0, 'memory_total': 0, 'load': 0} for i in range(4)]})
-
-if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-    app.run(host='0.0.0.0', port=5001, debug=True)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=False)

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>{{ experiment.name }} - PICO Pipeline</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        :root {
+            color-scheme: light dark;
+        }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Roboto, sans-serif;
+            background: #f1f5f9;
+            color: #0f172a;
+        }
+        nav {
+            background: #ffffff;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        nav h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: #667eea;
+        }
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+        .user-info {
+            font-weight: 600;
+            color: #475569;
+        }
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem 3rem;
+        }
+        .breadcrumb {
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+        .breadcrumb a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+        .experiment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 2rem;
+        }
+        .experiment-title {
+            margin: 0 0 0.5rem;
+            font-size: 2rem;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 0.4rem 1rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .status-created {
+            background: #e0e7ff;
+            color: #4338ca;
+        }
+        .status-running {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .status-completed {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .status-failed {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .btn {
+            background: #667eea;
+            border: none;
+            color: #fff;
+            padding: 0.65rem 1.5rem;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background: #5568d3;
+        }
+        .btn-secondary {
+            background: #94a3b8;
+        }
+        .btn-secondary:hover {
+            background: #64748b;
+        }
+        .btn-small {
+            padding: 0.4rem 0.9rem;
+            font-size: 0.85rem;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .info-card {
+            background: #ffffff;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        .info-card h3 {
+            margin: 0 0 1rem;
+            font-size: 1.1rem;
+            color: #334155;
+        }
+        .info-item {
+            margin-bottom: 0.75rem;
+            font-size: 0.9rem;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #475569;
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+        .info-value {
+            color: #0f172a;
+            word-break: break-word;
+        }
+        .terminal-container {
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
+        .terminal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.25rem;
+            background: #1e293b;
+            color: #cbd5e1;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+        }
+        .terminal-header h3 {
+            margin: 0;
+            font-size: 1rem;
+        }
+        pre {
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            margin: 0;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            max-height: 600px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .empty-log {
+            padding: 3rem;
+            text-align: center;
+            color: #64748b;
+            font-style: italic;
+        }
+        .params-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 0.75rem;
+            font-size: 0.85rem;
+        }
+        .param-item {
+            padding: 0.5rem 0.75rem;
+            background: #f8fafc;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+        .param-key {
+            font-weight: 600;
+            color: #475569;
+        }
+        .param-value {
+            color: #0f172a;
+        }
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: #0f172a;
+                color: #e2e8f0;
+            }
+            nav {
+                background: #1e293b;
+            }
+            nav h1 {
+                color: #818cf8;
+            }
+            .user-info {
+                color: #cbd5e1;
+            }
+            .info-card,
+            .terminal-container {
+                background: #1e293b;
+            }
+            .info-card h3 {
+                color: #cbd5e1;
+            }
+            .info-label {
+                color: #94a3b8;
+            }
+            .info-value {
+                color: #e2e8f0;
+            }
+            pre {
+                background: #020617;
+            }
+            .param-item {
+                background: #0f172a;
+                border-color: #334155;
+            }
+            .param-key {
+                color: #94a3b8;
+            }
+            .param-value {
+                color: #cbd5e1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <h1>🔬 PICO Pipeline</h1>
+        <div class="nav-right">
+            <span class="user-info">👤 {{ current_user.username }}</span>
+            <a href="{{ url_for('logout') }}" class="btn-secondary btn-small">Logout</a>
+        </div>
+    </nav>
+    
+    <main>
+        <div class="breadcrumb">
+            <a href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
+        </div>
+        
+        <div class="experiment-header">
+            <div>
+                <h1 class="experiment-title">{{ experiment.name }}</h1>
+                <span class="status-badge status-{{ experiment.status }}">{{ experiment.status }}</span>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                {% if experiment.status != 'running' %}
+                <a href="{{ url_for('edit_experiment', experiment_id=experiment.id) }}" class="btn">Edit & Run</a>
+                {% endif %}
+            </div>
+        </div>
+        
+        
+        <div class="info-grid">
+            <div class="info-card">
+                <h3>📊 Experiment Info</h3>
+                {% if experiment.description %}
+                <div class="info-item">
+                    <span class="info-label">Description</span>
+                    <span class="info-value">{{ experiment.description }}</span>
+                </div>
+                {% endif %}
+                <div class="info-item">
+                    <span class="info-label">Created</span>
+                    <span class="info-value">{{ experiment.created_at.strftime('%Y-%m-%d %H:%M:%S') if experiment.created_at else 'N/A' }}</span>
+                </div>
+                {% if experiment.started_at %}
+                <div class="info-item">
+                    <span class="info-label">Started</span>
+                    <span class="info-value">{{ experiment.started_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+                </div>
+                {% endif %}
+                {% if experiment.completed_at %}
+                <div class="info-item">
+                    <span class="info-label">Completed</span>
+                    <span class="info-value">{{ experiment.completed_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+                </div>
+                {% endif %}
+                {% if experiment.exit_code is not none %}
+                <div class="info-item">
+                    <span class="info-label">Exit Code</span>
+                    <span class="info-value">{{ experiment.exit_code }}</span>
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="info-card">
+                <h3>📁 Data Paths</h3>
+                {% if experiment.input_path %}
+                <div class="info-item">
+                    <span class="info-label">Input Directory</span>
+                    <span class="info-value" style="font-size: 0.8rem;">{{ experiment.input_path }}</span>
+                </div>
+                {% endif %}
+                {% if experiment.output_path %}
+                <div class="info-item">
+                    <span class="info-label">Output Directory</span>
+                    <span class="info-value" style="font-size: 0.8rem;">{{ experiment.output_path }}</span>
+                </div>
+                {% endif %}
+                {% if experiment.log_file %}
+                <div class="info-item">
+                    <span class="info-label">Log File</span>
+                    <span class="info-value" style="font-size: 0.8rem;">{{ experiment.log_file }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if experiment.parameters %}
+        <div class="info-card" style="margin-bottom: 2rem;">
+            <h3>⚙️ Pipeline Parameters</h3>
+            <div class="params-grid">
+                {% for key, value in experiment.parameters.items() %}
+                <div class="param-item">
+                    <div class="param-key">{{ key }}</div>
+                    <div class="param-value">{{ value }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="terminal-container">
+            <div class="terminal-header">
+                <h3>📝 Execution Log</h3>
+                <div style="display: flex; gap: 0.5rem;">
+                    {% if log_content %}
+                    <a href="{{ url_for('download_log', experiment_id=experiment.id) }}" class="btn-secondary btn-small">Download Log</a>
+                    {% endif %}
+                    <button type="button" class="btn-secondary btn-small" id="copy-btn">Copy Log</button>
+                </div>
+            </div>
+            {% if log_content %}
+            <pre id="terminal">{{ log_content }}</pre>
+            {% else %}
+            <div class="empty-log">
+                {% if experiment.status == 'created' %}
+                    Experiment has not been run yet.
+                {% else %}
+                    No log file available.
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </main>
+    
+    <script>
+        const copyBtn = document.getElementById('copy-btn');
+        const terminal = document.getElementById('terminal');
+        
+        if (copyBtn && terminal) {
+            copyBtn.addEventListener('click', function () {
+                const text = terminal.textContent;
+                if (!text) return;
+                navigator.clipboard.writeText(text).then(() => {
+                    copyBtn.textContent = 'Copied!';
+                    setTimeout(() => {
+                        copyBtn.textContent = 'Copy Log';
+                    }, 2000);
+                }).catch((error) => {
+                    alert('Failed to copy: ' + error.message);
+                });
+            });
+        }
+    </script>
+</body>
+</html>

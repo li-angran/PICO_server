@@ -1,174 +1,183 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PICO Calcium Processing Platform - Login</title>
+    <meta charset="utf-8">
+    <title>Login - PICO Pipeline</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            color-scheme: light dark;
         }
-
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            margin: 0;
+            font-family: "Segoe UI", Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+            color: #0f172a;
             display: flex;
             align-items: center;
             justify-content: center;
+            min-height: 100vh;
         }
-
         .login-container {
-            background: white;
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            background: #ffffff;
+            padding: 2.5rem;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             width: 100%;
             max-width: 400px;
         }
-
-        .logo {
+        h1 {
+            margin: 0 0 0.5rem;
+            font-size: 1.8rem;
             text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .logo h1 {
             color: #667eea;
-            font-size: 28px;
-            margin-bottom: 10px;
         }
-
-        .logo p {
-            color: #666;
-            font-size: 14px;
+        p.subtitle {
+            margin: 0 0 2rem;
+            text-align: center;
+            color: #64748b;
+            font-size: 0.95rem;
         }
-
-        .form-group {
-            margin-bottom: 20px;
+        .field {
+            margin-bottom: 1.25rem;
         }
-
-        .form-group label {
+        label {
             display: block;
-            margin-bottom: 5px;
-            color: #333;
-            font-weight: 500;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #334155;
         }
-
-        .form-group input {
+        input[type="text"],
+        input[type="password"] {
             width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 14px;
-            transition: border-color 0.3s;
+            padding: 0.75rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
         }
-
-        .form-group input:focus {
+        input[type="text"]:focus,
+        input[type="password"]:focus {
             outline: none;
             border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
-
-        .btn-login {
+        button {
             width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: #667eea;
             border: none;
-            border-radius: 5px;
-            font-size: 16px;
+            color: #fff;
+            padding: 0.85rem;
+            border-radius: 8px;
+            font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s;
+            transition: background 0.2s;
         }
-
-        .btn-login:hover {
-            transform: translateY(-2px);
+        button:hover {
+            background: #5568d3;
         }
-
-        .btn-login:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
+        .alert {
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.25rem;
+            font-size: 0.9rem;
         }
-
-        .error-message {
-            background: #fee;
-            color: #c33;
-            padding: 10px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            display: none;
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
         }
-
-        .error-message.show {
-            display: block;
+        .info-box {
+            margin-top: 2rem;
+            padding: 1.25rem;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        .info-box h3 {
+            margin: 0 0 0.75rem;
+            font-size: 0.95rem;
+            color: #334155;
+        }
+        .info-box ul {
+            margin: 0;
+            padding-left: 1.25rem;
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+        .info-box li {
+            margin-bottom: 0.4rem;
+        }
+        @media (prefers-color-scheme: dark) {
+            .login-container {
+                background: #1e293b;
+                color: #e2e8f0;
+            }
+            h1 {
+                color: #818cf8;
+            }
+            label {
+                color: #cbd5e1;
+            }
+            input[type="text"],
+            input[type="password"] {
+                background: #0f172a;
+                border-color: #334155;
+                color: #f8fafc;
+            }
+            input[type="text"]:focus,
+            input[type="password"]:focus {
+                border-color: #818cf8;
+                box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.15);
+            }
+            .info-box {
+                background: #0f172a;
+                border-color: #334155;
+            }
+            .info-box h3 {
+                color: #cbd5e1;
+            }
         }
     </style>
 </head>
 <body>
     <div class="login-container">
-        <div class="logo">
-            <h1>🧠 PICO Platform</h1>
-            <p>Calcium Signal Processing</p>
-        </div>
+        <h1>🔬 PICO Pipeline</h1>
+        <p class="subtitle">Sign in to access your experiments</p>
         
-        <div class="error-message" id="errorMessage"></div>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
         
-        <form id="loginForm">
-            <div class="form-group">
+        <form method="post" autocomplete="off">
+            <div class="field">
                 <label for="username">Username</label>
                 <input type="text" id="username" name="username" required autofocus>
             </div>
             
-            <div class="form-group">
+            <div class="field">
                 <label for="password">Password</label>
                 <input type="password" id="password" name="password" required>
             </div>
             
-            <button type="submit" class="btn-login" id="loginBtn">Login</button>
+            <button type="submit">Sign In</button>
         </form>
+        
+        <div class="info-box">
+            <h3>Demo Accounts:</h3>
+            <ul>
+                <li><strong>admin</strong> / admin123</li>
+                <li><strong>user1</strong> / user123</li>
+                <li><strong>user2</strong> / user123</li>
+                <li><strong>researcher</strong> / research123</li>
+            </ul>
+        </div>
     </div>
-
-    <script>
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const loginBtn = document.getElementById('loginBtn');
-            const errorMessage = document.getElementById('errorMessage');
-            
-            loginBtn.disabled = true;
-            loginBtn.textContent = 'Logging in...';
-            errorMessage.classList.remove('show');
-            
-            try {
-                const response = await fetch('/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ username, password })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    window.location.href = '/dashboard';
-                } else {
-                    errorMessage.textContent = data.message || 'Invalid username or password';
-                    errorMessage.classList.add('show');
-                    loginBtn.disabled = false;
-                    loginBtn.textContent = 'Login';
-                }
-            } catch (error) {
-                errorMessage.textContent = 'An error occurred. Please try again.';
-                errorMessage.classList.add('show');
-                loginBtn.disabled = false;
-                loginBtn.textContent = 'Login';
-            }
-        });
-    </script>
 </body>
 </html>

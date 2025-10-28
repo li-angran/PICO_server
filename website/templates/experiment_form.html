@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>{% if experiment %}Edit{% else %}New{% endif %} Experiment - PICO Pipeline</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        :root {
+            color-scheme: light dark;
+        }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Roboto, sans-serif;
+            background: #f1f5f9;
+            color: #0f172a;
+        }
+        nav {
+            background: #ffffff;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        nav h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: #667eea;
+        }
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+        .user-info {
+            font-weight: 600;
+            color: #475569;
+        }
+        main {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem 3rem;
+        }
+        .breadcrumb {
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+        .breadcrumb a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+        h2 {
+            margin: 0 0 1.5rem;
+            font-size: 1.8rem;
+        }
+        form {
+            display: grid;
+            gap: 1rem;
+            background: #ffffff;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+        }
+        label {
+            font-weight: 600;
+            display: block;
+            margin-bottom: 0.4rem;
+        }
+        input[type="text"],
+        textarea {
+            width: 100%;
+            padding: 0.65rem 0.75rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            box-sizing: border-box;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        input[type="text"]:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+        }
+        .field {
+            display: flex;
+            flex-direction: column;
+        }
+        .row {
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap: 1rem;
+        }
+        .col-6 { grid-column: span 6; }
+        .col-4 { grid-column: span 4; }
+        .col-3 { grid-column: span 3; }
+        .col-2 { grid-column: span 2; }
+        .col-12 { grid-column: span 12; }
+        button, .btn {
+            justify-self: flex-start;
+            background: #667eea;
+            border: none;
+            color: #fff;
+            padding: 0.7rem 1.6rem;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease-in-out;
+            text-decoration: none;
+            display: inline-block;
+        }
+        button:hover, .btn:hover {
+            background: #5568d3;
+        }
+        button:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            background: #0ea5e9;
+        }
+        .btn-secondary:hover { background: #0284c7; }
+        .btn-ghost {
+            background: #94a3b8;
+        }
+        .btn-ghost:hover { background: #64748b; }
+        .btn-stop {
+            background: #ef4444;
+        }
+        .btn-stop:hover { background: #dc2626; }
+        .status-box {
+            margin-top: 1.5rem;
+            display: grid;
+            gap: 0.75rem;
+        }
+        .status-line {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #94a3b8;
+        }
+        .status-text {
+            font-weight: 600;
+        }
+        pre {
+            background: #0f172a;
+            color: #e2e8f0;
+            border-radius: 12px;
+            padding: 1rem;
+            margin: 0;
+            font-size: 0.85rem;
+            line-height: 1.4;
+            max-height: 420px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .terminal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1rem;
+            background: #1e293b;
+            color: #cbd5e1;
+            border-radius: 12px 12px 0 0;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+        }
+        .terminal-container {
+            margin-top: 0.5rem;
+            background: #0f172a;
+            border-radius: 12px;
+            box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.35);
+        }
+        .hint {
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+        details {
+            border: 1px solid rgba(148,163,184,0.3);
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            background: rgba(241,245,249,0.5);
+        }
+        details > summary {
+            cursor: pointer;
+            font-weight: 700;
+            margin: 0.25rem 0 0.75rem;
+        }
+        .section-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+        }
+        .section-box h3 {
+            margin: 0 0 1rem;
+            font-size: 1.1rem;
+            color: #334155;
+        }
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: #0f172a;
+                color: #e2e8f0;
+            }
+            nav {
+                background: #1e293b;
+            }
+            nav h1 {
+                color: #818cf8;
+            }
+            .user-info {
+                color: #cbd5e1;
+            }
+            form {
+                background: #1e293b;
+                box-shadow: none;
+            }
+            input[type="text"],
+            textarea {
+                background: #0f172a;
+                color: #f8fafc;
+                border-color: #334155;
+            }
+            input[type="text"]:focus,
+            textarea:focus {
+                border-color: #818cf8;
+                box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.25);
+            }
+            pre {
+                background: #020617;
+            }
+            details { background: rgba(2,6,23,0.35); border-color: #334155; }
+            .section-box {
+                background: #0f172a;
+                border-color: #334155;
+            }
+            .section-box h3 {
+                color: #cbd5e1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <h1>🔬 PICO Pipeline</h1>
+        <div class="nav-right">
+            <span class="user-info">👤 {{ current_user.username }}</span>
+            <a href="{{ url_for('logout') }}" class="btn-ghost" style="padding: 0.4rem 0.9rem; font-size: 0.85rem;">Logout</a>
+        </div>
+    </nav>
+    
+    <main>
+        <div class="breadcrumb">
+            <a href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
+        </div>
+        
+        <h2>{% if experiment %}Edit Experiment: {{ experiment.name }}{% else %}New Experiment{% endif %}</h2>
+
+        {% if not defaults.script_exists %}
+        <p class="hint" style="color: #ef4444; font-weight: 600;">⚠ Pipeline script not found at <code>somm_processingv1.py</code>. Ensure the workspace is intact.</p>
+        {% endif %}
+
+        <form id="run-form" autocomplete="off">
+            <div class="section-box">
+                <h3>Experiment Information</h3>
+                <div class="field">
+                    <label for="exp-name">Experiment Name *</label>
+                    <input type="text" id="exp-name" name="name" placeholder="My Calcium Imaging Experiment" 
+                           value="{% if experiment %}{{ experiment.name }}{% endif %}" required>
+                </div>
+                <div class="field">
+                    <label for="exp-desc">Description (optional)</label>
+                    <textarea id="exp-desc" name="description" placeholder="Brief description of this experiment...">{% if experiment and experiment.description %}{{ experiment.description }}{% endif %}</textarea>
+                </div>
+            </div>
+
+            <div class="section-box">
+                <h3>Data Paths</h3>
+                <div class="field">
+                    <label for="input-path">Input directory *</label>
+                    <input type="text" id="input-path" name="input_path" placeholder="/path/to/input" 
+                           value="{% if experiment %}{{ experiment.input_path }}{% elif defaults.input_path %}{{ defaults.input_path }}{% endif %}" required>
+                    <span class="hint">Folder containing raw frames (TIFF/JPG/PNG).</span>
+                </div>
+                <div class="field">
+                    <label for="output-path">Output directory *</label>
+                    <input type="text" id="output-path" name="output_path" placeholder="/path/to/output" 
+                           value="{% if experiment %}{{ experiment.output_path }}{% elif defaults.output_path %}{{ defaults.output_path }}{% endif %}" required>
+                    <span class="hint">A new folder will be created if needed.</span>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="field col-6">
+                    <label for="set-frame-num">Frame count</label>
+                    <input type="text" id="set-frame-num" name="set_frame_num" placeholder="6000" 
+                           value="{% if experiment and experiment.parameters and experiment.parameters.set_frame_num %}{{ experiment.parameters.set_frame_num }}{% else %}6000{% endif %}">
+                    <span class="hint">Set to 0 to auto-detect, or click Auto-detect below.</span>
+                </div>
+                <div class="field col-6">
+                    <label>&nbsp;</label>
+                    <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap: wrap;">
+                        <label style="display:flex; align-items:center; gap:0.5rem; font-weight:600;">
+                            <input type="checkbox" id="auto-set-frame"> Auto-detect frames
+                        </label>
+                        <button type="button" class="btn-secondary" id="btn-auto-detect">Auto-detect now</button>
+                        <span class="hint" id="auto-detect-result"></span>
+                    </div>
+                </div>
+            </div>
+
+            <details open>
+                <summary>Flow control</summary>
+                <div class="row">
+                    <label class="col-3" style="display:flex; gap:0.5rem; align-items:center;">
+                        <input type="checkbox" id="jump-to-rmbg"> jump_to_rmbg
+                    </label>
+                    <label class="col-3" style="display:flex; gap:0.5rem; align-items:center;">
+                        <input type="checkbox" id="jump-to-seg"> jump_to_seg
+                    </label>
+                    <label class="col-3" style="display:flex; gap:0.5rem; align-items:center;">
+                        <input type="checkbox" id="jump-to-vis"> jump_to_vis
+                    </label>
+                </div>
+            </details>
+
+            <details>
+                <summary>Motion correction</summary>
+                <div class="row">
+                    <div class="field col-3"><label for="fr">fr</label><input type="text" id="fr" placeholder="10" value="10"></div>
+                    <div class="field col-3"><label for="mc-chunk-size">mc_chunk_size</label><input type="text" id="mc-chunk-size" placeholder="1000" value="1000"></div>
+                    <div class="field col-3"><label for="save-movie">save_movie</label><input type="checkbox" id="save-movie" checked></div>
+                    <div class="field col-3"><label for="num-frames-split">num_frames_split</label><input type="text" id="num-frames-split" placeholder="100" value="100"></div>
+                    <div class="field col-3"><label for="max-deviation-rigid">max_deviation_rigid</label><input type="text" id="max-deviation-rigid" placeholder="3" value="3"></div>
+                    <div class="field col-3"><label for="pw-rigid">pw_rigid</label><input type="checkbox" id="pw-rigid"></div>
+                    <div class="field col-3"><label for="shifts-opencv">shifts_opencv</label><input type="checkbox" id="shifts-opencv" checked></div>
+                    <div class="field col-3"><label for="border-nan">border_nan</label><input type="text" id="border-nan" placeholder="copy" value="copy"></div>
+                    <div class="field col-3"><label for="downsample-ratio">downsample_ratio</label><input type="text" id="downsample-ratio" placeholder="0.1" value="0.1"></div>
+
+                    <div class="field col-4"><label for="max-shifts">max_shifts</label><input type="text" id="max-shifts" placeholder="100,100" value="100,100"><span class="hint">Format: h,w</span></div>
+                    <div class="field col-4"><label for="strides">strides</label><input type="text" id="strides" placeholder="96,96" value="96,96"></div>
+                    <div class="field col-4"><label for="overlaps">overlaps</label><input type="text" id="overlaps" placeholder="48,48" value="48,48"></div>
+                </div>
+            </details>
+
+            <details>
+                <summary>Preprocessing</summary>
+                <div class="row">
+                    <div class="field col-12"><label>crop_parameter [y, x, h, w]</label>
+                        <div class="row">
+                            <input class="col-3" type="text" id="crop-y" placeholder="153" value="153">
+                            <input class="col-3" type="text" id="crop-x" placeholder="303" value="303">
+                            <input class="col-3" type="text" id="crop-h" placeholder="1000" value="1000">
+                            <input class="col-3" type="text" id="crop-w" placeholder="1000" value="1000">
+                        </div>
+                    </div>
+                    <label class="col-3" style="display:flex; gap:0.5rem; align-items:center;">
+                        <input type="checkbox" id="intensity-corr"> intensity_corr_flag
+                    </label>
+                    <label class="col-3" style="display:flex; gap:0.5rem; align-items:center;">
+                        <input type="checkbox" id="bad-frame-detect" checked> bad_frame_detect_flag
+                    </label>
+                </div>
+            </details>
+
+            <details>
+                <summary>Background removal (DeepDefinite)</summary>
+                <div class="row">
+                    <div class="field col-3"><label for="up-sample">up_sample</label><input type="text" id="up-sample" placeholder="2" value="2"></div>
+                    <div class="field col-3"><label for="rmbg-chunk-size">rmbg_chunk_size</label><input type="text" id="rmbg-chunk-size" placeholder="1000" value="1000"></div>
+                    <div class="field col-3"><label for="rmbg-gsize">rmbg_gsize</label><input type="text" id="rmbg-gsize" placeholder="6" value="6"></div>
+                    <div class="field col-3"><label for="ckpt-pth">ckpt_pth</label><input type="text" id="ckpt-pth" placeholder="utils/deepdefinite_ckpt_resize_2.pth" value="utils/deepdefinite_ckpt_resize_2.pth"></div>
+                    <div class="field col-3"><label for="device">device</label><input type="text" id="device" placeholder="cuda" value="cuda"></div>
+                    <div class="field col-3"><label for="gpu-ids">gpu_ids</label><input type="text" id="gpu-ids" placeholder="0" value="0"></div>
+                </div>
+            </details>
+
+            <details>
+                <summary>Segmentation</summary>
+                <div class="row">
+                    <div class="field col-3"><label for="patch-size">patch_size</label><input type="text" id="patch-size" placeholder="500" value="500"></div>
+                    <div class="field col-3"><label for="pixel-size">pixel_size</label><input type="text" id="pixel-size" placeholder="2" value="2"></div>
+                    <div class="field col-3"><label for="min-area">minArea</label><input type="text" id="min-area" placeholder="50" value="50"></div>
+                    <div class="field col-3"><label for="avg-area">avgArea</label><input type="text" id="avg-area" placeholder="100" value="100"></div>
+                    <div class="field col-3"><label for="thresh-pmap">thresh_pmap</label><input type="text" id="thresh-pmap" placeholder="1" value="1"></div>
+                    <div class="field col-3"><label for="thresh-mask">thresh_mask</label><input type="text" id="thresh-mask" placeholder="0.5" value="0.5"></div>
+                    <div class="field col-3"><label for="thresh-com0">thresh_COM0</label><input type="text" id="thresh-com0" placeholder="6" value="6"></div>
+                    <div class="field col-3"><label for="thresh-com">thresh_COM</label><input type="text" id="thresh-com" placeholder="10" value="10"></div>
+                    <div class="field col-3"><label for="cons">cons</label><input type="text" id="cons" placeholder="5" value="5"></div>
+                </div>
+            </details>
+
+            <details>
+                <summary>Saving</summary>
+                <div class="row">
+                    <div class="field col-3"><label for="avi-quality">avi_quality</label><input type="text" id="avi-quality" placeholder="100" value="100"></div>
+                </div>
+            </details>
+
+            <div style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items: center;">
+                {% if experiment %}
+                <button type="button" id="save-btn" class="btn-secondary">Save Changes</button>
+                <button type="submit" id="save-and-run-btn">Save & Run Pipeline</button>
+                <button type="button" id="stop-btn" class="btn btn-stop" style="display: none;">⏹ Stop Pipeline</button>
+                {% else %}
+                <button type="button" id="create-btn" class="btn-secondary">Create Experiment</button>
+                <button type="submit" id="run-btn" disabled>Run Pipeline</button>
+                <button type="button" id="stop-btn" class="btn btn-stop" style="display: none;">⏹ Stop Pipeline</button>
+                {% endif %}
+                <button type="button" class="btn-secondary" id="reset-defaults">Reset to defaults</button>
+                <a href="{{ url_for('dashboard') }}" class="btn-ghost">Cancel</a>
+            </div>
+        </form>
+
+        <section class="status-box">
+            <div class="status-line">
+                <div class="status-indicator" id="status-indicator"></div>
+                <span class="status-text" id="status-text">Ready</span>
+            </div>
+            <span class="hint" id="status-details"></span>
+        </section>
+
+        <section class="terminal-container">
+            <div class="terminal-header">
+                <span>Terminal Output</span>
+                <button type="button" class="btn-ghost" id="copy-btn" style="padding: 0.4rem 0.9rem; font-size: 0.85rem;">Copy</button>
+            </div>
+            <pre id="terminal" tabindex="0">Waiting for pipeline to start...</pre>
+        </section>
+    </main>
+
+    <script>
+    (function () {
+        const form = document.getElementById('run-form');
+        const terminal = document.getElementById('terminal');
+        const statusText = document.getElementById('status-text');
+        const statusDetails = document.getElementById('status-details');
+        const statusIndicator = document.getElementById('status-indicator');
+        const copyBtn = document.getElementById('copy-btn');
+        const autoCheck = document.getElementById('auto-set-frame');
+        const setFrameNum = document.getElementById('set-frame-num');
+        const autoBtn = document.getElementById('btn-auto-detect');
+        const autoResult = document.getElementById('auto-detect-result');
+        const resetBtn = document.getElementById('reset-defaults');
+        const stopBtn = document.getElementById('stop-btn');
+        const createBtn = document.getElementById('create-btn');
+        const runBtn = document.getElementById('run-btn');
+        const saveBtn = document.getElementById('save-btn');
+
+        let experimentId = {% if experiment %}{{ experiment.id }}{% else %}null{% endif %};
+        let eventSource = null;
+        let isRunning = false;
+
+        const STATUS_COLORS = {
+            idle: '#94a3b8',
+            running: '#22c55e',
+            completed: '#0ea5e9',
+            failed: '#ef4444',
+            starting: '#eab308'
+        };
+
+        function setIndicator(colorKey) {
+            const color = STATUS_COLORS[colorKey] || STATUS_COLORS.idle;
+            statusIndicator.style.background = color;
+        }
+
+        function setStatus(label, detail, colorKey) {
+            statusText.textContent = label;
+            statusDetails.textContent = detail || '';
+            setIndicator(colorKey);
+        }
+
+        function appendLine(text) {
+            if (typeof text !== 'string') return;
+            terminal.textContent = terminal.textContent.replace(/Waiting for pipeline to start\.\.\.$/, '');
+            terminal.textContent += (terminal.textContent ? '\n' : '') + text;
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        function replaceLogs(lines) {
+            if (!Array.isArray(lines)) return;
+            terminal.textContent = lines.join('\n');
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        function fetchLogs() {
+            fetch('/api/logs').then((response) => response.json()).then((data) => {
+                replaceLogs(data.logs || []);
+            }).catch((error) => {
+                appendLine('Failed to load logs: ' + error.message);
+            });
+        }
+
+        function refreshStatus() {
+            fetch('/api/status').then((response) => response.json()).then((data) => {
+                if (data.running) {
+                    isRunning = true;
+                    if (stopBtn) stopBtn.style.display = 'inline-block';
+                    setStatus('Running', 'Pipeline is currently executing.', 'running');
+                } else if (data.exit_code === 0) {
+                    isRunning = false;
+                    if (stopBtn) stopBtn.style.display = 'none';
+                    setStatus('Completed', 'Last run finished successfully.', 'completed');
+                } else if (typeof data.exit_code === 'number') {
+                    isRunning = false;
+                    if (stopBtn) stopBtn.style.display = 'none';
+                    setStatus('Completed with errors', 'Exit code: ' + data.exit_code, 'failed');
+                } else {
+                    isRunning = false;
+                    if (stopBtn) stopBtn.style.display = 'none';
+                    setStatus('Ready', 'Ready to start pipeline.', 'idle');
+                }
+            }).catch((error) => {
+                appendLine('Failed to fetch status: ' + error.message);
+            });
+        }
+
+        function ensureStream() {
+            if (eventSource) return;
+            eventSource = new EventSource('/api/stream');
+
+            eventSource.onmessage = function (event) {
+                if (event.data) appendLine(event.data);
+            };
+
+            eventSource.addEventListener('done', function (event) {
+                const exitCode = Number(event.data);
+                isRunning = false;
+                if (stopBtn) stopBtn.style.display = 'none';
+                if (exitCode === 0) {
+                    setStatus('Completed', 'Exit code: 0', 'completed');
+                } else {
+                    setStatus('Completed with errors', 'Exit code: ' + exitCode, 'failed');
+                }
+            });
+
+            eventSource.onerror = function () {
+                if (eventSource) {
+                    eventSource.close();
+                    eventSource = null;
+                    setTimeout(ensureStream, 3000);
+                }
+            };
+        }
+
+        // Handle Create button (new experiment)
+        if (createBtn) {
+            createBtn.addEventListener('click', function () {
+                const expName = document.getElementById('exp-name').value.trim();
+                const expDesc = document.getElementById('exp-desc').value.trim();
+
+                if (!expName) {
+                    setStatus('Validation error', 'Please provide an experiment name.', 'failed');
+                    return;
+                }
+
+                createBtn.disabled = true;
+                setStatus('Creating', 'Creating new experiment...', 'starting');
+
+                fetch('/api/experiment/create', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name: expName, description: expDesc})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.ok) throw new Error(data.message);
+                    experimentId = data.experiment_id;
+                    runBtn.disabled = false;
+                    setStatus('Created', 'Experiment created. You can now run the pipeline.', 'completed');
+                    // Update the page URL without reload
+                    window.history.pushState({}, '', `/experiment/${experimentId}/edit`);
+                })
+                .catch(error => {
+                    setStatus('Failed', error.message, 'failed');
+                })
+                .finally(() => {
+                    createBtn.disabled = false;
+                });
+            });
+        }
+
+        // Handle Save button (existing experiment)
+        if (saveBtn) {
+            saveBtn.addEventListener('click', function () {
+                const expName = document.getElementById('exp-name').value.trim();
+                const expDesc = document.getElementById('exp-desc').value.trim();
+
+                if (!expName) {
+                    setStatus('Validation error', 'Please provide an experiment name.', 'failed');
+                    return;
+                }
+
+                saveBtn.disabled = true;
+                setStatus('Saving', 'Saving changes...', 'starting');
+
+                fetch(`/api/experiment/${experimentId}/update`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name: expName, description: expDesc})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.ok) throw new Error(data.message);
+                    setStatus('Saved', 'Changes saved successfully.', 'completed');
+                })
+                .catch(error => {
+                    setStatus('Failed', error.message, 'failed');
+                })
+                .finally(() => {
+                    saveBtn.disabled = false;
+                });
+            });
+        }
+
+        // Handle Stop button
+        if (stopBtn) {
+            stopBtn.addEventListener('click', function () {
+                if (!experimentId || !isRunning) return;
+
+                stopBtn.disabled = true;
+                
+                fetch(`/api/experiment/${experimentId}/stop`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.ok) {
+                        setStatus('Stopped', 'Pipeline stopped by user.', 'failed');
+                        isRunning = false;
+                        stopBtn.style.display = 'none';
+                    } else {
+                        setStatus('Stop failed', data.message, 'failed');
+                    }
+                })
+                .catch(error => {
+                    setStatus('Stop failed', error.message, 'failed');
+                })
+                .finally(() => {
+                    stopBtn.disabled = false;
+                });
+            });
+        }
+
+        form.addEventListener('submit', function (event) {
+            event.preventDefault();
+            
+            if (!experimentId) {
+                setStatus('Error', 'Please create the experiment first.', 'failed');
+                return;
+            }
+
+            const expName = document.getElementById('exp-name').value.trim();
+            const expDesc = document.getElementById('exp-desc').value.trim();
+            const inputPath = document.getElementById('input-path').value.trim();
+            const outputPath = document.getElementById('output-path').value.trim();
+
+            if (!expName || !inputPath || !outputPath) {
+                setStatus('Validation error', 'Please fill in all required fields.', 'failed');
+                return;
+            }
+
+            const fd = new FormData(form);
+            const payload = {
+                name: expName,
+                description: expDesc,
+                input_path: inputPath,
+                output_path: outputPath,
+            };
+
+            // Frame number and auto flag
+            const auto = autoCheck.checked;
+            payload.auto_set_frame = auto;
+            const frameVal = (setFrameNum.value || '').toString().trim();
+            const frameNumParsed = Number(frameVal);
+            if (auto) {
+                payload.set_frame_num = Number.isFinite(frameNumParsed) && frameNumParsed > 0 ? frameNumParsed : 0;
+            } else if (frameVal) {
+                payload.set_frame_num = frameNumParsed;
+            }
+
+            // Flow
+            payload.jump_to_rmbg = document.getElementById('jump-to-rmbg').checked;
+            payload.jump_to_seg = document.getElementById('jump-to-seg').checked;
+            payload.jump_to_vis = document.getElementById('jump-to-vis').checked;
+
+            // Motion correction
+            payload.fr = document.getElementById('fr').value;
+            payload.mc_chunk_size = document.getElementById('mc-chunk-size').value;
+            payload.save_movie = document.getElementById('save-movie').checked;
+            payload.max_shifts = document.getElementById('max-shifts').value;
+            payload.strides = document.getElementById('strides').value;
+            payload.overlaps = document.getElementById('overlaps').value;
+            payload.num_frames_split = document.getElementById('num-frames-split').value;
+            payload.max_deviation_rigid = document.getElementById('max-deviation-rigid').value;
+            payload.pw_rigid = document.getElementById('pw-rigid').checked;
+            payload.shifts_opencv = document.getElementById('shifts-opencv').checked;
+            payload.border_nan = document.getElementById('border-nan').value;
+            payload.downsample_ratio = document.getElementById('downsample-ratio').value;
+
+            // Preprocessing
+            const crop = [
+                document.getElementById('crop-y').value,
+                document.getElementById('crop-x').value,
+                document.getElementById('crop-h').value,
+                document.getElementById('crop-w').value,
+            ].filter(Boolean).join(',');
+            if (crop) payload.crop_parameter = crop;
+            payload.intensity_corr_flag = document.getElementById('intensity-corr').checked;
+            payload.bad_frame_detect_flag = document.getElementById('bad-frame-detect').checked;
+
+            // DeepDefinite
+            payload.up_sample = document.getElementById('up-sample').value;
+            payload.rmbg_chunk_size = document.getElementById('rmbg-chunk-size').value;
+            payload.rmbg_gsize = document.getElementById('rmbg-gsize').value;
+            payload.ckpt_pth = document.getElementById('ckpt-pth').value;
+            payload.device = document.getElementById('device').value;
+            payload.gpu_ids = document.getElementById('gpu-ids').value;
+
+            // Segmentation
+            payload.patch_size = document.getElementById('patch-size').value;
+            payload.pixel_size = document.getElementById('pixel-size').value;
+            payload.minArea = document.getElementById('min-area').value;
+            payload.avgArea = document.getElementById('avg-area').value;
+            payload.thresh_pmap = document.getElementById('thresh-pmap').value;
+            payload.thresh_mask = document.getElementById('thresh-mask').value;
+            payload.thresh_COM0 = document.getElementById('thresh-com0').value;
+            payload.thresh_COM = document.getElementById('thresh-com').value;
+            payload.cons = document.getElementById('cons').value;
+
+            // Saving
+            payload.avi_quality = document.getElementById('avi-quality').value;
+
+            setStatus('Starting', 'Launching pipeline...', 'starting');
+            isRunning = true;
+            terminal.textContent = '';
+            if (stopBtn) stopBtn.style.display = 'inline-block';
+
+            // Run the experiment
+            runExperiment(experimentId, payload);
+        });
+
+        function runExperiment(expId, payload) {
+            fetch(`/api/experiment/${expId}/run`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw new Error(data.message || 'Failed to start pipeline.');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                ensureStream();
+                fetchLogs();
+                setStatus('Running', data.message || 'Pipeline is executing.', 'running');
+            })
+            .catch(error => {
+                isRunning = false;
+                if (stopBtn) stopBtn.style.display = 'none';
+                setStatus('Failed to start', error.message, 'failed');
+                appendLine('Error: ' + error.message);
+            });
+        }
+
+        autoBtn.addEventListener('click', function () {
+            const inputPath = document.getElementById('input-path').value.trim();
+            if (!inputPath) {
+                setStatus('Input required', 'Please provide an input directory first.', 'failed');
+                return;
+            }
+            autoBtn.disabled = true;
+            autoResult.textContent = 'Detecting...';
+            fetch('/api/detect_frames?input_path=' + encodeURIComponent(inputPath))
+                .then((r) => r.json())
+                .then((data) => {
+                    if (!data.ok) throw new Error(data.message || 'Detect failed');
+                    setFrameNum.value = data.frames;
+                    autoCheck.checked = true;
+                    autoResult.textContent = `Detected ${data.frames} frames`;
+                })
+                .catch((err) => {
+                    autoResult.textContent = 'Detect failed: ' + err.message;
+                })
+                .finally(() => {
+                    autoBtn.disabled = false;
+                });
+        });
+
+        resetBtn.addEventListener('click', function () {
+            setFrameNum.value = '6000';
+            autoCheck.checked = false;
+            document.getElementById('fr').value = '10';
+            document.getElementById('mc-chunk-size').value = '1000';
+            document.getElementById('save-movie').checked = true;
+            document.getElementById('max-shifts').value = '100,100';
+            document.getElementById('strides').value = '96,96';
+            document.getElementById('overlaps').value = '48,48';
+            document.getElementById('num-frames-split').value = '100';
+            document.getElementById('max-deviation-rigid').value = '3';
+            document.getElementById('pw-rigid').checked = false;
+            document.getElementById('shifts-opencv').checked = true;
+            document.getElementById('border-nan').value = 'copy';
+            document.getElementById('downsample-ratio').value = '0.1';
+            document.getElementById('crop-y').value = '153';
+            document.getElementById('crop-x').value = '303';
+            document.getElementById('crop-h').value = '1000';
+            document.getElementById('crop-w').value = '1000';
+            document.getElementById('intensity-corr').checked = false;
+            document.getElementById('bad-frame-detect').checked = true;
+            document.getElementById('up-sample').value = '2';
+            document.getElementById('rmbg-chunk-size').value = '1000';
+            document.getElementById('rmbg-gsize').value = '6';
+            document.getElementById('ckpt-pth').value = 'utils/deepdefinite_ckpt_resize_2.pth';
+            document.getElementById('device').value = 'cuda';
+            document.getElementById('gpu-ids').value = '0';
+            document.getElementById('patch-size').value = '500';
+            document.getElementById('pixel-size').value = '2';
+            document.getElementById('min-area').value = '50';
+            document.getElementById('avg-area').value = '100';
+            document.getElementById('thresh-pmap').value = '1';
+            document.getElementById('thresh-mask').value = '0.5';
+            document.getElementById('thresh-com0').value = '6';
+            document.getElementById('thresh-com').value = '10';
+            document.getElementById('cons').value = '5';
+            document.getElementById('avi-quality').value = '100';
+            setStatus('Defaults restored', '', 'completed');
+        });
+
+        copyBtn.addEventListener('click', function () {
+            const text = terminal.textContent;
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(() => {
+                setStatus('Copied', 'Log output copied to clipboard.', 'completed');
+            }).catch((error) => {
+                setStatus('Copy failed', error.message, 'failed');
+            });
+        });
+
+        ensureStream();
+        refreshStatus();
+    })();
+    </script>
+</body>
+</html>

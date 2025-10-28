@@ -1,182 +1,143 @@
-# PICO Platform - Quick Start Guide
+# Quick Start Guide - Multi-User PICO Pipeline Web Interface
 
-## Installation (5 minutes)
+## 🚀 Quick Setup (3 steps)
 
-1. Navigate to the website directory:
+### 1. Install Dependencies
 ```bash
-cd /data/home/angran/BBNC/code/PICO_ca_processing/website
+cd website
+pip install -r requirements_multiuser.txt
 ```
 
-2. Run the setup script:
+### 2. Start the Server
 ```bash
-chmod +x setup.sh
-./setup.sh
+python app_multiuser.py
 ```
 
-3. Follow the prompts to create user accounts.
-
-## Starting the Server
-
-### Option 1: Development Mode (Testing)
+Or use the startup script:
 ```bash
-python app.py
+bash start_multiuser.sh
 ```
 
-### Option 2: Production Mode (Recommended)
-```bash
-./start_server.sh
+### 3. Access the Application
+Open your browser to: **http://localhost:5000**
+
+## 🔑 Login
+
+Use any of these demo accounts:
+
+| Username   | Password     |
+|------------|--------------|
+| admin      | admin123     |
+| user1      | user123      |
+| user2      | user123      |
+| researcher | research123  |
+
+## 📋 First Experiment
+
+1. **Login** with your credentials
+2. Click **"+ New Experiment"**
+3. Fill in the form:
+   - **Name:** "Test Calcium Imaging"
+   - **Description:** "My first test experiment"
+   - **Input path:** `/path/to/your/tiff/files`
+   - **Output path:** `/path/to/output/folder`
+4. Configure pipeline parameters (or use defaults)
+5. Click **"Create & Run Experiment"**
+6. Watch real-time logs in the terminal output section
+
+## 📊 View Your Experiments
+
+- Go to **Dashboard** to see all your experiments
+- Click **"View Details"** to see logs and parameters
+- Click **"Edit & Run"** to modify and re-run
+
+## 🗂️ Where Are Logs Saved?
+
+All logs are automatically saved to:
+```
+website/experiment_logs/exp_{ID}_{TIMESTAMP}.log
 ```
 
-### Option 3: Background Mode (Persistent)
-```bash
-nohup ./start_server.sh > server.log 2>&1 &
+Example: `experiment_logs/exp_1_20241028_143022.log`
+
+## 🔄 Re-running Experiments
+
+You can edit and re-run any completed experiment:
+1. Find it in your dashboard
+2. Click "Edit & Run"
+3. Modify parameters
+4. Run again - a new log file will be created
+
+## 💾 Database Location
+
+User accounts and experiment metadata are stored in:
+```
+website/pico_experiments.db
 ```
 
-To check if running:
-```bash
-ps aux | grep gunicorn
-```
+**Backup this file** to preserve your experiment history!
 
-To stop:
-```bash
-pkill -f gunicorn
-```
+## 🛑 Stopping the Server
 
-## Accessing the Platform
+Press `Ctrl+C` in the terminal where the server is running.
 
-Open a web browser and navigate to:
-```
-http://<server-ip>:5000
-```
+## 🔧 Troubleshooting
 
-Replace `<server-ip>` with your server's IP address.
+### Can't access the website?
+- Make sure the server is running (check terminal)
+- Try: http://127.0.0.1:5000
+- Check firewall settings
 
-## First Time Usage
+### Pipeline script not found?
+- Ensure `somm_processingv1.py` exists in the parent directory
+- Check paths in `app_multiuser.py` if needed
 
-1. **Login**
-   - Use the username and password created during setup
+### Login not working?
+- Delete `pico_experiments.db` to recreate database
+- Restart the server
 
-2. **Create an Experiment**
-   - Click "New Experiment"
-   - Enter name: e.g., "Test Run 1"
-   - Enter description: e.g., "Testing with sample data"
-   - Select GPU ID (check GPU info on dashboard)
-   - Modify parameters if needed (defaults loaded from params.json)
-   - Click "Save Experiment"
+### Need more users?
+Edit `database.py` and add them to the `create_default_users()` function.
 
-3. **Configure Parameters**
-   - `data_path`: Path to input frames
-   - `out_path`: Path for output files
-   - Other parameters match process_script.py arguments
+## 🌐 Access from Other Devices
 
-4. **Start Processing**
-   - Click "Start" button on the experiment card
-   - Monitor progress in real-time by clicking the card
-   - View logs, GPU usage, and status
+To allow access from other computers on your network:
 
-5. **View Results**
-   - Click on completed experiment
-   - View output files
-   - Download results
+1. Find your server's IP address:
+   ```bash
+   hostname -I
+   ```
 
-## User Management
+2. Other devices can access via:
+   ```
+   http://YOUR_IP_ADDRESS:5000
+   ```
 
-### Create New User
-```bash
-python init_db.py create <username> <password>
-```
+3. Example: `http://192.168.1.100:5000`
 
-### List All Users
-```bash
-python init_db.py list
-```
+## 📚 Full Documentation
 
-### Delete User
-```bash
-python init_db.py delete <username>
-```
+See [README_MULTIUSER.md](README_MULTIUSER.md) for complete documentation including:
+- API endpoints
+- Database schema
+- Production deployment
+- Configuration options
 
-## Troubleshooting
+## ⚠️ Security Note
 
-### Can't access from other devices
-Check firewall:
-```bash
-sudo ufw allow 5000/tcp
-```
+**For production use:**
+- Change default passwords
+- Set a secure SECRET_KEY environment variable
+- Use HTTPS with a reverse proxy
+- Configure proper authentication
 
-### Port already in use
-Change port in `app.py` (line at bottom):
-```python
-app.run(host='0.0.0.0', port=8080, debug=False)
-```
+## 🆘 Need Help?
 
-### View server logs
-```bash
-tail -f server.log
-tail -f error.log
-```
+1. Check the terminal output for error messages
+2. Review logs in `experiment_logs/` directory
+3. Verify input/output paths are valid
+4. Make sure PICO environment is activated
 
-### Check experiment logs
-Navigate to: `experiments/exp_<id>_<timestamp>/process.log`
+---
 
-## System Service (Optional)
-
-For automatic startup on boot:
-
-1. Update service file paths if needed:
-```bash
-nano pico-platform.service
-```
-
-2. Install service:
-```bash
-sudo cp pico-platform.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable pico-platform
-sudo systemctl start pico-platform
-```
-
-3. Check status:
-```bash
-sudo systemctl status pico-platform
-```
-
-4. View logs:
-```bash
-sudo journalctl -u pico-platform -f
-```
-
-## Tips
-
-- **GPU Selection**: Check GPU utilization on dashboard before starting
-- **Parameter Presets**: Save commonly used parameter sets by creating template experiments
-- **Multiple Experiments**: You can queue multiple experiments on different GPUs
-- **Log Monitoring**: Logs refresh automatically every 3 seconds when viewing running experiments
-- **Stop Safely**: Always use the "Stop" button rather than killing processes manually
-
-## Common Parameters
-
-Key parameters you'll often modify:
-
-- `data_path`: Input data location
-- `out_path`: Output directory
-- `gpu_ids`: GPU device ID (also set via GPU ID dropdown)
-- `fr`: Frame rate
-- `mc_chunk_size`: Memory chunk size for motion correction
-- `rmbg_chunk_size`: Chunk size for background removal
-- `patch_size`: Size of patches for processing
-
-## Support
-
-For issues with:
-- **Platform**: Check logs in `website/` directory
-- **Processing**: Check experiment logs in `experiments/exp_*/process.log`
-- **Process Script**: Refer to main PICO documentation
-
-## Security Notes
-
-⚠️ **Important**: 
-- Change the SECRET_KEY in `app.py` before production use
-- Use HTTPS in production (setup reverse proxy with nginx)
-- Keep user passwords secure
-- Regular backup of `pico_platform.db`
+**Happy Processing! 🔬**
