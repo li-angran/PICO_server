@@ -466,6 +466,86 @@
         let eventSource = null;
         let isRunning = false;
 
+        // Load saved parameters if editing an experiment
+        {% if experiment and experiment.parameters %}
+        const savedParams = {{ experiment.parameters | tojson }};
+        
+        // Helper to set field value safely
+        function setField(id, value) {
+            const field = document.getElementById(id);
+            if (field && value !== null && value !== undefined) {
+                if (field.type === 'checkbox') {
+                    field.checked = value === true || value === 'true' || value === 'True' || value === 1;
+                } else {
+                    field.value = value;
+                }
+            }
+        }
+        
+        // Apply saved parameters to form fields
+        if (savedParams) {
+            // Frame settings
+            if (savedParams.auto_set_frame !== undefined) {
+                autoCheck.checked = savedParams.auto_set_frame === true || savedParams.auto_set_frame === 'true';
+            }
+            setField('set-frame-num', savedParams.set_frame_num);
+            
+            // Flow control
+            setField('jump-to-rmbg', savedParams.jump_to_rmbg);
+            setField('jump-to-seg', savedParams.jump_to_seg);
+            setField('jump-to-vis', savedParams.jump_to_vis);
+            
+            // Motion correction
+            setField('fr', savedParams.fr);
+            setField('mc-chunk-size', savedParams.mc_chunk_size);
+            setField('save-movie', savedParams.save_movie);
+            setField('max-shifts', savedParams.max_shifts);
+            setField('strides', savedParams.strides);
+            setField('overlaps', savedParams.overlaps);
+            setField('num-frames-split', savedParams.num_frames_split);
+            setField('max-deviation-rigid', savedParams.max_deviation_rigid);
+            setField('pw-rigid', savedParams.pw_rigid);
+            setField('shifts-opencv', savedParams.shifts_opencv);
+            setField('border-nan', savedParams.border_nan);
+            setField('downsample-ratio', savedParams.downsample_ratio);
+            
+            // Preprocessing - crop parameters
+            if (savedParams.crop_parameter) {
+                const cropParts = savedParams.crop_parameter.toString().split(',');
+                if (cropParts.length >= 4) {
+                    setField('crop-y', cropParts[0]);
+                    setField('crop-x', cropParts[1]);
+                    setField('crop-h', cropParts[2]);
+                    setField('crop-w', cropParts[3]);
+                }
+            }
+            setField('intensity-corr', savedParams.intensity_corr_flag);
+            setField('bad-frame-detect', savedParams.bad_frame_detect_flag);
+            
+            // DeepDefinite
+            setField('up-sample', savedParams.up_sample);
+            setField('rmbg-chunk-size', savedParams.rmbg_chunk_size);
+            setField('rmbg-gsize', savedParams.rmbg_gsize);
+            setField('ckpt-pth', savedParams.ckpt_pth);
+            setField('device', savedParams.device);
+            setField('gpu-ids', savedParams.gpu_ids);
+            
+            // Segmentation
+            setField('patch-size', savedParams.patch_size);
+            setField('pixel-size', savedParams.pixel_size);
+            setField('min-area', savedParams.minArea);
+            setField('avg-area', savedParams.avgArea);
+            setField('thresh-pmap', savedParams.thresh_pmap);
+            setField('thresh-mask', savedParams.thresh_mask);
+            setField('thresh-com0', savedParams.thresh_COM0);
+            setField('thresh-com', savedParams.thresh_COM);
+            setField('cons', savedParams.cons);
+            
+            // Saving
+            setField('avi-quality', savedParams.avi_quality);
+        }
+        {% endif %}
+
         const STATUS_COLORS = {
             idle: '#94a3b8',
             running: '#22c55e',
@@ -600,19 +680,96 @@
             saveBtn.addEventListener('click', function () {
                 const expName = document.getElementById('exp-name').value.trim();
                 const expDesc = document.getElementById('exp-desc').value.trim();
+                const inputPath = document.getElementById('input-path').value.trim();
+                const outputPath = document.getElementById('output-path').value.trim();
 
                 if (!expName) {
                     setStatus('Validation error', 'Please provide an experiment name.', 'failed');
                     return;
                 }
 
+                if (!inputPath || !outputPath) {
+                    setStatus('Validation error', 'Please provide input and output paths.', 'failed');
+                    return;
+                }
+
                 saveBtn.disabled = true;
                 setStatus('Saving', 'Saving changes...', 'starting');
+
+                const payload = {
+                    name: expName,
+                    description: expDesc,
+                    input_path: inputPath,
+                    output_path: outputPath,
+                };
+
+                // Frame number and auto flag
+                const auto = autoCheck.checked;
+                payload.auto_set_frame = auto;
+                const frameVal = (setFrameNum.value || '').toString().trim();
+                const frameNumParsed = Number(frameVal);
+                if (auto) {
+                    payload.set_frame_num = Number.isFinite(frameNumParsed) && frameNumParsed > 0 ? frameNumParsed : 0;
+                } else if (frameVal) {
+                    payload.set_frame_num = frameNumParsed;
+                }
+
+                // Flow
+                payload.jump_to_rmbg = document.getElementById('jump-to-rmbg').checked;
+                payload.jump_to_seg = document.getElementById('jump-to-seg').checked;
+                payload.jump_to_vis = document.getElementById('jump-to-vis').checked;
+
+                // Motion correction
+                payload.fr = document.getElementById('fr').value;
+                payload.mc_chunk_size = document.getElementById('mc-chunk-size').value;
+                payload.save_movie = document.getElementById('save-movie').checked;
+                payload.max_shifts = document.getElementById('max-shifts').value;
+                payload.strides = document.getElementById('strides').value;
+                payload.overlaps = document.getElementById('overlaps').value;
+                payload.num_frames_split = document.getElementById('num-frames-split').value;
+                payload.max_deviation_rigid = document.getElementById('max-deviation-rigid').value;
+                payload.pw_rigid = document.getElementById('pw-rigid').checked;
+                payload.shifts_opencv = document.getElementById('shifts-opencv').checked;
+                payload.border_nan = document.getElementById('border-nan').value;
+                payload.downsample_ratio = document.getElementById('downsample-ratio').value;
+
+                // Preprocessing
+                const crop = [
+                    document.getElementById('crop-y').value,
+                    document.getElementById('crop-x').value,
+                    document.getElementById('crop-h').value,
+                    document.getElementById('crop-w').value,
+                ].filter(Boolean).join(',');
+                if (crop) payload.crop_parameter = crop;
+                payload.intensity_corr_flag = document.getElementById('intensity-corr').checked;
+                payload.bad_frame_detect_flag = document.getElementById('bad-frame-detect').checked;
+
+                // DeepDefinite
+                payload.up_sample = document.getElementById('up-sample').value;
+                payload.rmbg_chunk_size = document.getElementById('rmbg-chunk-size').value;
+                payload.rmbg_gsize = document.getElementById('rmbg-gsize').value;
+                payload.ckpt_pth = document.getElementById('ckpt-pth').value;
+                payload.device = document.getElementById('device').value;
+                payload.gpu_ids = document.getElementById('gpu-ids').value;
+
+                // Segmentation
+                payload.patch_size = document.getElementById('patch-size').value;
+                payload.pixel_size = document.getElementById('pixel-size').value;
+                payload.minArea = document.getElementById('min-area').value;
+                payload.avgArea = document.getElementById('avg-area').value;
+                payload.thresh_pmap = document.getElementById('thresh-pmap').value;
+                payload.thresh_mask = document.getElementById('thresh-mask').value;
+                payload.thresh_COM0 = document.getElementById('thresh-com0').value;
+                payload.thresh_COM = document.getElementById('thresh-com').value;
+                payload.cons = document.getElementById('cons').value;
+
+                // Saving
+                payload.avi_quality = document.getElementById('avi-quality').value;
 
                 fetch(`/api/experiment/${experimentId}/update`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({name: expName, description: expDesc})
+                    body: JSON.stringify(payload)
                 })
                 .then(response => response.json())
                 .then(data => {

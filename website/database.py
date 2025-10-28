@@ -95,29 +95,3 @@ def init_db(app):
     db.init_app(app)
     with app.app_context():
         db.create_all()
-        
-        # Create default users if none exist
-        if User.query.count() == 0:
-            create_default_users()
-
-
-def create_default_users():
-    """Create default user accounts."""
-    default_users = [
-        {"username": "admin", "password": "admin123"},
-        {"username": "user1", "password": "user123"},
-        {"username": "user2", "password": "user123"},
-        {"username": "researcher", "password": "research123"},
-    ]
-    
-    for user_data in default_users:
-        user = User(username=user_data["username"])
-        user.set_password(user_data["password"])
-        db.session.add(user)
-    
-    try:
-        db.session.commit()
-        print("✓ Default users created successfully")
-    except Exception as e:
-        db.session.rollback()
-        print(f"Error creating default users: {e}")

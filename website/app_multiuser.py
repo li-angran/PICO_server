@@ -303,11 +303,27 @@ def update_experiment(experiment_id: int) -> Response:
     
     name = (payload.get("name") or "").strip()
     description = (payload.get("description") or "").strip()
+    input_path = (payload.get("input_path") or "").strip()
+    output_path = (payload.get("output_path") or "").strip()
     
     if name:
         experiment.name = name
     if "description" in payload:
         experiment.description = description
+    if input_path:
+        experiment.input_path = input_path
+    if output_path:
+        experiment.output_path = output_path
+    
+    # Store all other parameters
+    parameters = {}
+    excluded_keys = ["name", "description", "input_path", "output_path"]
+    for key in payload.keys():
+        if key not in excluded_keys:
+            parameters[key] = payload.get(key)
+    
+    if parameters:
+        experiment.parameters = parameters
     
     db.session.commit()
     
@@ -654,6 +670,34 @@ def list_experiments() -> Response:
     """List all experiments for the current user."""
     experiments = Experiment.query.filter_by(user_id=current_user.id).order_by(Experiment.created_at.desc()).all()
     return jsonify({"experiments": [exp.to_dict() for exp in experiments]})
+
+
+@app.get("/api/experiment/<int:experiment_id>/log")
+@login_required
+def get_experiment_log(experiment_id: int) -> Response:
+    """Get the current log content for an experiment."""
+    experiment = Experiment.query.get_or_404(experiment_id)
+    
+    # Check ownership
+    if experiment.user_id != current_user.id:
+        return jsonify({"ok": False, "message": "Permission denied"}), 403
+    
+    log_content = ""
+    if experiment.log_file:
+        log_path = Path(experiment.log_file)
+        if log_path.exists():
+            try:
+                with open(log_path, "r") as f:
+                    log_content = f.read()
+            except Exception as e:
+                log_content = f"Error reading log file: {e}"
+    
+    return jsonify({
+        "ok": True,
+        "log_content": log_content,
+        "status": experiment.status,
+        "exit_code": experiment.exit_code
+    })
 
 
 if __name__ == "__main__":

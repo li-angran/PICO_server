@@ -113,6 +113,12 @@
             padding: 0.4rem 0.9rem;
             font-size: 0.85rem;
         }
+        .btn-danger {
+            background: #dc2626;
+        }
+        .btn-danger:hover {
+            background: #b91c1c;
+        }
         .info-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -260,10 +266,12 @@
         <div class="experiment-header">
             <div>
                 <h1 class="experiment-title">{{ experiment.name }}</h1>
-                <span class="status-badge status-{{ experiment.status }}">{{ experiment.status }}</span>
+                <span class="status-badge status-{{ experiment.status }}" id="status-badge">{{ experiment.status }}</span>
             </div>
             <div style="display: flex; gap: 0.5rem;">
-                {% if experiment.status != 'running' %}
+                {% if experiment.status == 'running' %}
+                <button type="button" class="btn btn-danger" id="stop-btn">Stop Experiment</button>
+                {% else %}
                 <a href="{{ url_for('edit_experiment', experiment_id=experiment.id) }}" class="btn">Edit & Run</a>
                 {% endif %}
             </div>
@@ -344,14 +352,14 @@
             <div class="terminal-header">
                 <h3>📝 Execution Log</h3>
                 <div style="display: flex; gap: 0.5rem;">
-                    {% if log_content %}
+                    {% if log_content or experiment.status == 'running' %}
                     <a href="{{ url_for('download_log', experiment_id=experiment.id) }}" class="btn-secondary btn-small">Download Log</a>
                     {% endif %}
                     <button type="button" class="btn-secondary btn-small" id="copy-btn">Copy Log</button>
                 </div>
             </div>
-            {% if log_content %}
-            <pre id="terminal">{{ log_content }}</pre>
+            {% if log_content or experiment.status == 'running' %}
+            <pre id="terminal">{{ log_content if log_content else 'Waiting for logs...' }}</pre>
             {% else %}
             <div class="empty-log">
                 {% if experiment.status == 'created' %}
@@ -367,6 +375,11 @@
     <script>
         const copyBtn = document.getElementById('copy-btn');
         const terminal = document.getElementById('terminal');
+        const stopBtn = document.getElementById('stop-btn');
+        const statusBadge = document.getElementById('status-badge');
+        const experimentId = {{ experiment.id }};
+        let experimentStatus = "{{ experiment.status }}";
+        let refreshInterval = null;
         
         if (copyBtn && terminal) {
             copyBtn.addEventListener('click', function () {
@@ -382,6 +395,81 @@
                 });
             });
         }
+        
+        // Stop button functionality
+        if (stopBtn) {
+            stopBtn.addEventListener('click', function () {
+                if (!confirm('Are you sure you want to stop this experiment?')) {
+                    return;
+                }
+                
+                stopBtn.disabled = true;
+                stopBtn.textContent = 'Stopping...';
+                
+                fetch(`/api/experiment/${experimentId}/stop`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.ok) {
+                        alert('Experiment stopped successfully');
+                        location.reload();
+                    } else {
+                        alert('Failed to stop experiment: ' + data.message);
+                        stopBtn.disabled = false;
+                        stopBtn.textContent = 'Stop Experiment';
+                    }
+                })
+                .catch(error => {
+                    alert('Error stopping experiment: ' + error.message);
+                    stopBtn.disabled = false;
+                    stopBtn.textContent = 'Stop Experiment';
+                });
+            });
+        }
+        
+        // Auto-refresh logs when experiment is running
+        function refreshLog() {
+            fetch(`/api/experiment/${experimentId}/log`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.ok && terminal) {
+                        terminal.textContent = data.log_content;
+                        // Auto-scroll to bottom
+                        terminal.scrollTop = terminal.scrollHeight;
+                        
+                        // Update status badge if status changed
+                        if (data.status !== experimentStatus) {
+                            experimentStatus = data.status;
+                            location.reload(); // Reload page to update all status info
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching log:', error);
+                });
+        }
+        
+        // Start auto-refresh if experiment is running
+        if (experimentStatus === 'running') {
+            // Refresh immediately
+            refreshLog();
+            // Then refresh every 2 seconds
+            refreshInterval = setInterval(refreshLog, 2000);
+        }
+        
+        // Stop refreshing when page is hidden/closed
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden && refreshInterval) {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+            } else if (!document.hidden && experimentStatus === 'running' && !refreshInterval) {
+                refreshInterval = setInterval(refreshLog, 2000);
+            }
+        });
     </script>
 </body>
 </html>
