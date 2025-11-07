@@ -42,13 +42,20 @@ fi
 
 echo ""
 echo -e "${GREEN}Starting PICO multi-user web interface...${NC}"
-echo -e "${BLUE}Access at: http://localhost:5000${NC}"
+
+# Determine primary IP (best-effort)
+PRIMARY_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+if [ -z "$PRIMARY_IP" ]; then
+    PRIMARY_IP="<server-ip>"
+fi
+
+echo -e "${BLUE}Access URLs:${NC}"
+echo -e "  • On this machine:   http://127.0.0.1:5010"
+echo -e "  • From your network: http://$PRIMARY_IP:5010"
 echo ""
-echo -e "${YELLOW}Default accounts:${NC}"
-echo "  • admin / admin123"
-echo "  • user1 / user123"
-echo "  • user2 / user123"
-echo "  • researcher / research123"
+echo -e "${YELLOW}User accounts:${NC}"
+echo "  • Create or manage users with: python manage_users.py add|list|password|delete"
+echo "    (first run creates the database automatically)"
 echo ""
 echo -e "${YELLOW}Press Ctrl+C to stop the server${NC}"
 echo ""

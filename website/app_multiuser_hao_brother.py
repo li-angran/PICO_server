@@ -34,7 +34,7 @@ login_manager.login_view = "login"
 
 # Paths and global state
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-PIPELINE_SCRIPT = PROJECT_ROOT / "process_script_qichen.py"
+PIPELINE_SCRIPT = PROJECT_ROOT / "process_script.py"
 LOGS_DIR = Path(__file__).resolve().parent / "experiment_logs"
 LOGS_DIR.mkdir(exist_ok=True)
 
@@ -772,4 +772,4 @@ def get_gpu_usage() -> Response:
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5010, debug=False)
+    app.run(host="0.0.0.0", port=5020, debug=False)
